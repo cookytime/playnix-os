@@ -1,0 +1,13 @@
+[Unit]
+Description=Auto Install y tareas extras
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/root/autoinstall.sh
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
