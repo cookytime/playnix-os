@@ -9,36 +9,23 @@ on:
 jobs:
   build_iso:
     runs-on: ubuntu-latest
-    container: archlinux:latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Initialize pacman keyring
+      - name: Build and Package ISO in Arch Container
         run: |
-          pacman-key --init
-          pacman-key --populate archlinux
-
-      - name: Install archiso
-        run: |
-          pacman -Sy --noconfirm archiso git
-
-      - name: Copy official releng profile
-        run: |
-          rm -rf /tmp/build-releng
-          mkdir -p /tmp/build-releng
-          cp -r /usr/share/archiso/configs/releng/* /tmp/build-releng/
-
-      - name: Overlay custom files onto build-releng
-        run: |
-          cp -r overlay/airootfs/* /tmp/build-releng/airootfs/
-          cp -r overlay/syslinux/*  /tmp/build-releng/syslinux/
-
-      - name: Build Arch ISO
-        run: |
-          rm -rf /tmp/archiso-work out
-          mkarchiso -v -w /tmp/archiso-work -o out /tmp/build-releng
+          docker run --rm --privileged \
+            -v "${{ github.workspace }}:/workspace" \
+            -w /workspace archlinux:latest \
+            bash -c "pacman-key --init && pacman-key --populate archlinux && \
+                     pacman -Sy --noconfirm archiso git && \
+                     rm -rf /tmp/build-releng && mkdir -p /tmp/build-releng && \
+                     cp -r /usr/share/archiso/configs/releng/* /tmp/build-releng/ && \
+                     cp -r ./overlay/airootfs/* /tmp/build-releng/airootfs/ && \
+                     cp -r ./overlay/syslinux/* /tmp/build-releng/syslinux/ && \
+                     rm -rf /tmp/archiso-work out && mkarchiso -v -w /tmp/archiso-work -o out /tmp/build-releng"
 
       - name: Upload ISO as action artifact
         uses: actions/upload-artifact@v4
