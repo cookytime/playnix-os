@@ -4,7 +4,11 @@
     "audio": "pipewire"
   },
   "bootloader": "Grub",
-  "custom_commands": [],
+  "custom_commands": [
+    "chmod +x /home/playnix/Desktop/enable-gaming.desktop",
+    "kbuildsycoca5 --noincremental --noincremental",
+    "chown -R playnix:playnix /home/playnix"
+  ],
   "disk_config": {
     "config_type": "default_layout",
     "device": "/dev/nvme0n1",
