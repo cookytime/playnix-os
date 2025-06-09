@@ -1,4 +1,4 @@
-name: Build Custom Arch ISO
+name: Build playnixOS ISO
 
 permissions:
   contents: write
@@ -40,13 +40,13 @@ jobs:
       - name: Rename ISO to fixed filename
         run: |
           mkdir -p out
-          mv out/*.iso out/custom-archlinux.iso
+          mv out/*.iso out/playnixOS.iso
 
       - name: Upload ISO as action artifact
         uses: actions/upload-artifact@v4
         with:
-          name: custom-archlinux.iso
-          path: out/custom-archlinux.iso
+          name: playnixOS.iso
+          path: out/playnixOS.iso
 
       - name: Create GitHub Release
         id: create_release
@@ -65,6 +65,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: out/custom-archlinux.iso
-          asset_name: custom-archlinux.iso
+          asset_path: out/playnixOS.iso
+          asset_name: playnixOS.iso
           asset_content_type: application/octet-stream
