@@ -19,11 +19,7 @@ jobs:
 
       - name: Build and Package ISO in Arch Container
         run: |
-          MYUID=$(id -u)
-          MYGID=$(id -g)
-
           docker run --rm --privileged \
-            -u $MYUID:$MYGID \
             -v "${{ github.workspace }}:/workspace" \
             -w /workspace \
             archlinux:latest \
@@ -37,8 +33,13 @@ jobs:
               rm -rf /tmp/archiso-work out && \
               mkarchiso -v -w /tmp/archiso-work -o out /tmp/build-releng"
 
+      - name: Fix permissions on output directory
+        run: |
+          sudo chown -R $(id -u):$(id -g) out
+
       - name: Rename ISO to fixed filename
         run: |
+          mkdir -p out
           mv out/*.iso out/custom-archlinux.iso
 
       - name: Upload ISO as action artifact
