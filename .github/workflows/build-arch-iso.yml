@@ -19,20 +19,26 @@ jobs:
 
       - name: Build and Package ISO in Arch Container
         run: |
+          UID=$(id -u)
+          GID=$(id -g)
+
           docker run --rm --privileged \
+            -u $UID:$GID \
             -v "${{ github.workspace }}:/workspace" \
-            -w /workspace archlinux:latest \
-            bash -c "pacman-key --init && pacman-key --populate archlinux && \
-                     pacman -Sy --noconfirm archiso git && \
-                     rm -rf /tmp/build-releng && mkdir -p /tmp/build-releng && \
-                     cp -r /usr/share/archiso/configs/releng/* /tmp/build-releng/ && \
-                     cp -r ./overlay/airootfs/* /tmp/build-releng/airootfs/ && \
-                     cp -r ./overlay/syslinux/* /tmp/build-releng/syslinux/ && \
-                     rm -rf /tmp/archiso-work out && mkarchiso -v -w /tmp/archiso-work -o out /tmp/build-releng"
+            -w /workspace \
+            archlinux:latest \
+            bash -c "\
+              pacman-key --init && pacman-key --populate archlinux && \
+              pacman -Sy --noconfirm archiso git && \
+              rm -rf /tmp/build-releng && mkdir -p /tmp/build-releng && \
+              cp -r /usr/share/archiso/configs/releng/* /tmp/build-releng/ && \
+              cp -r ./overlay/airootfs/* /tmp/build-releng/airootfs/ && \
+              cp -r ./overlay/syslinux/* /tmp/build-releng/syslinux/ && \
+              rm -rf /tmp/archiso-work out && \
+              mkarchiso -v -w /tmp/archiso-work -o out /tmp/build-releng"
 
       - name: Rename ISO to fixed filename
         run: |
-          mkdir -p out
           mv out/*.iso out/custom-archlinux.iso
 
       - name: Upload ISO as action artifact
