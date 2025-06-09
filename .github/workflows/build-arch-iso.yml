@@ -19,11 +19,11 @@ jobs:
 
       - name: Build and Package ISO in Arch Container
         run: |
-          UID=$(id -u)
-          GID=$(id -g)
+          MYUID=$(id -u)
+          MYGID=$(id -g)
 
           docker run --rm --privileged \
-            -u $UID:$GID \
+            -u $MYUID:$MYGID \
             -v "${{ github.workspace }}:/workspace" \
             -w /workspace \
             archlinux:latest \
