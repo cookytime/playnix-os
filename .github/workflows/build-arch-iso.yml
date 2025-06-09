@@ -30,11 +30,16 @@ jobs:
                      cp -r ./overlay/syslinux/* /tmp/build-releng/syslinux/ && \
                      rm -rf /tmp/archiso-work out && mkarchiso -v -w /tmp/archiso-work -o out /tmp/build-releng"
 
+      - name: Rename ISO to fixed filename
+        run: |
+          mkdir -p out
+          mv out/*.iso out/custom-archlinux.iso
+
       - name: Upload ISO as action artifact
         uses: actions/upload-artifact@v4
         with:
           name: custom-archlinux.iso
-          path: out/*.iso
+          path: out/custom-archlinux.iso
 
       - name: Create GitHub Release
         id: create_release
@@ -53,6 +58,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: out/*.iso
+          asset_path: out/custom-archlinux.iso
           asset_name: custom-archlinux.iso
           asset_content_type: application/octet-stream
