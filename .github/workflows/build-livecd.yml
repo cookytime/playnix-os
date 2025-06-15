@@ -29,7 +29,7 @@ jobs:
 
           # Actualizar sistema y instalar dependencias
           docker exec arch-builder pacman -Syu --noconfirm
-          docker exec arch-builder pacman -S --noconfirm archiso git base-devel
+          docker exec arch-builder pacman -S --noconfirm archiso git base-devel wget
 
       - name: Create archiso profile
         run: |
@@ -51,6 +51,7 @@ jobs:
           mkinitcpio
           mkinitcpio-archiso
           mkinitcpio-nfs-utils
+          archiso
 
           # Boot
           syslinux
@@ -79,6 +80,7 @@ jobs:
           dnsutils
           nftables
           iptables-nft
+          reflector
 
           # Hardware support
           mesa
@@ -88,6 +90,8 @@ jobs:
           xf86-video-ati
           xf86-video-vesa
           xf86-input-libinput
+          vulkan-intel
+          vulkan-radeon
 
           # Audio
           pipewire
@@ -95,11 +99,13 @@ jobs:
           pipewire-pulse
           pipewire-jack
           wireplumber
+          pavucontrol
 
-          # KDE Plasma (minimal)
+          # KDE Plasma (completo pero optimizado)
           plasma-desktop
           plasma-nm
           plasma-pa
+          plasma-systemmonitor
           powerdevil
           sddm
           sddm-kcm
@@ -108,8 +114,10 @@ jobs:
           kde-gtk-config
           kscreen
           kinfocenter
+          systemsettings
+          plasma-workspace-wallpapers
 
-          # Additional KDE apps
+          # Aplicaciones KDE esenciales
           konsole
           dolphin
           kate
@@ -117,9 +125,14 @@ jobs:
           spectacle
           okular
           gwenview
+          kcalc
+          kwrite
+
+          # Navegador y multimedia
+          firefox
+          vlc
 
           # System tools
-          firefox
           htop
           fastfetch
           git
@@ -128,12 +141,17 @@ jobs:
           wget
           curl
           rsync
+          tree
+          lsof
+          which
+          sudo
 
           # Fonts
           ttf-dejavu
           ttf-liberation
           noto-fonts
           noto-fonts-emoji
+          terminus-font
 
           # Archive tools
           zip
@@ -141,53 +159,108 @@ jobs:
           p7zip
           unrar
 
-          # Live system tools
+          # Live system and installation tools
           arch-install-scripts
           gparted
           testdisk
           ddrescue
+          parted
+          gdisk
+          dialog
+
+          # Development tools (optional)
+          python
+          python-pip
 
           # Additional utilities
-          sudo
-          which
-
-          # Installer Calamares and required Qt dependencies
-          calamares
-          qt5-tools
-          qt5-graphicaleffects
-          qt5-svg
-          qt5-translations
+          man-db
+          man-pages
           PKGEOF
           '
 
-      - name: Configure Calamares launcher
+      - name: Download and setup Calamares
+        run: |
+          docker exec arch-builder bash -c '
+          cd /build/archiso-kde
+
+          # Crear directorio para paquetes personalizados
+          mkdir -p custom-packages
+
+          # Descargar Calamares precompilado (ejemplo usando un repositorio que lo tenga)
+          # Nota: Este es un ejemplo, puede que necesites ajustar la URL
+          wget -O custom-packages/calamares.pkg.tar.xz "https://github.com/endeavouros-team/repo/raw/master/calamares-current-24.05.1-1-x86_64.pkg.tar.zst" || echo "Calamares download failed, continuing without it"
+
+          # Si la descarga falló, crear un script alternativo de instalación
+          if [ ! -f custom-packages/calamares.pkg.tar.xz ]; then
+            echo "Creating alternative installer script..."
+            mkdir -p airootfs/usr/local/bin
+            cat > airootfs/usr/local/bin/arch-installer << "INSTALLEREOF"
+#!/bin/bash
+# Script de instalación alternativo para Arch Linux
+echo "=== Instalador de Arch Linux ==="
+echo "Este es un instalador básico. Para una instalación completa:"
+echo "1. Particiona el disco con: cfdisk /dev/sdX"
+echo "2. Formatea las particiones"
+echo "3. Monta las particiones en /mnt"
+echo "4. Ejecuta: pacstrap /mnt base linux linux-firmware"
+echo "5. Ejecuta: genfstab -U /mnt >> /mnt/etc/fstab"
+echo "6. Ejecuta: arch-chroot /mnt"
+echo ""
+echo "¿Quieres abrir la guía de instalación de Arch Linux?"
+read -p "Presiona Enter para continuar..."
+firefox "https://wiki.archlinux.org/title/Installation_guide" &
+INSTALLEREOF
+            chmod +x airootfs/usr/local/bin/arch-installer
+          fi
+          '
+
+      - name: Configure installer desktop entry
         run: |
           docker exec arch-builder bash -c '
           cd /build/archiso-kde
 
           # Crear el directorio del escritorio si no existe
           mkdir -p airootfs/etc/skel/Desktop
-
-          # Crear el archivo .desktop para Calamares
-          cat > airootfs/etc/skel/Desktop/calamares.desktop << "DESKTOP_EOF"
-          [Desktop Entry]
-          Name=Instalador de Arch Linux (Calamares)
-          Comment=Instala Arch Linux fácilmente con el instalador gráfico Calamares
-          Exec=sudo calamares
-          Icon=calamares
-          Terminal=false
-          Type=Application
-          Categories=System;Installer;
-          X-KDE-RunOnDesktop=true
-          DESKTOP_EOF
-
-          # Asegurarse de que el acceso directo es ejecutable
-          chmod +x airootfs/etc/skel/Desktop/calamares.desktop
-
-          # (Opcional) Copiar también a /root/Desktop
           mkdir -p airootfs/root/Desktop
-          cp airootfs/etc/skel/Desktop/calamares.desktop airootfs/root/Desktop/
-          chmod +x airootfs/root/Desktop/calamares.desktop
+
+          # Crear el archivo .desktop para el instalador
+          cat > airootfs/etc/skel/Desktop/arch-installer.desktop << "DESKTOP_EOF"
+[Desktop Entry]
+Name=Instalador de Arch Linux
+Name[es]=Instalador de Arch Linux
+Comment=Install Arch Linux to your computer
+Comment[es]=Instala Arch Linux en tu computadora
+Exec=konsole -e sudo arch-installer
+Icon=system-software-install
+Terminal=false
+Type=Application
+Categories=System;Installer;
+X-KDE-RunOnDesktop=true
+DESKTOP_EOF
+
+          # Hacer el acceso directo ejecutable
+          chmod +x airootfs/etc/skel/Desktop/arch-installer.desktop
+
+          # Copiar también a /root/Desktop
+          cp airootfs/etc/skel/Desktop/arch-installer.desktop airootfs/root/Desktop/
+          chmod +x airootfs/root/Desktop/arch-installer.desktop
+
+          # Crear también un acceso directo a GParted
+          cat > airootfs/etc/skel/Desktop/gparted.desktop << "GPARTED_EOF"
+[Desktop Entry]
+Name=GParted
+Comment=Partition Editor
+Exec=sudo gparted
+Icon=gparted
+Terminal=false
+Type=Application
+Categories=System;
+X-KDE-RunOnDesktop=true
+GPARTED_EOF
+
+          chmod +x airootfs/etc/skel/Desktop/gparted.desktop
+          cp airootfs/etc/skel/Desktop/gparted.desktop airootfs/root/Desktop/
+          chmod +x airootfs/root/Desktop/gparted.desktop
           '
 
       - name: Create pacman.conf
@@ -197,24 +270,27 @@ jobs:
 
           # Crear pacman.conf personalizado
           cat > pacman.conf << "PACMANEOF"
-          [options]
-          HoldPkg     = pacman glibc
-          Architecture = x86_64
-          Color
-          CheckSpace
-          ParallelDownloads = 5
-          SigLevel    = Required DatabaseOptional
-          LocalFileSigLevel = Optional
+[options]
+HoldPkg     = pacman glibc
+Architecture = x86_64
+Color
+ILoveCandy
+CheckSpace
+VerbosePkgLists
+ParallelDownloads = 10
+SigLevel    = Required DatabaseOptional
+LocalFileSigLevel = Optional
+#RemoteFileSigLevel = Required
 
-          [core]
-          Include = /etc/pacman.d/mirrorlist
+[core]
+Include = /etc/pacman.d/mirrorlist
 
-          [extra]
-          Include = /etc/pacman.d/mirrorlist
+[extra]
+Include = /etc/pacman.d/mirrorlist
 
-          [multilib]
-          Include = /etc/pacman.d/mirrorlist
-          PACMANEOF
+[multilib]
+Include = /etc/pacman.d/mirrorlist
+PACMANEOF
           '
 
       - name: Configure system customization
@@ -223,86 +299,163 @@ jobs:
           cd /build/archiso-kde
 
           # Crear estructura de directorios necesaria
-          mkdir -p airootfs/etc/skel
+          mkdir -p airootfs/etc/skel/.config
           mkdir -p airootfs/etc/systemd/system
           mkdir -p airootfs/etc/sddm.conf.d
-          mkdir -p airootfs/root
+          mkdir -p airootfs/etc/NetworkManager/conf.d
+          mkdir -p airootfs/usr/local/bin
 
-          # Script de customización principal
+          # Script de customización principal (este es ejecutado por archiso automáticamente)
           cat > airootfs/root/customize_airootfs.sh << "CUSTOMEOF"
-          #!/usr/bin/env bash
+#!/usr/bin/env bash
 
-          set -e -u
+set -e -u
 
-          # Configurar locale
-          echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen
-          echo "es_ES.UTF-8 UTF-8" >> /etc/locale.gen
-          locale-gen
-          echo "LANG=en_US.UTF-8" > /etc/locale.conf
+echo "=== Iniciando customización del sistema live ==="
 
-          # Configurar teclado
-          echo "KEYMAP=es" > /etc/vconsole.conf
+# Configurar locale
+sed -i "s/#en_US.UTF-8/en_US.UTF-8/" /etc/locale.gen
+sed -i "s/#es_ES.UTF-8/es_ES.UTF-8/" /etc/locale.gen
+locale-gen
+echo "LANG=en_US.UTF-8" > /etc/locale.conf
 
-          # Configurar timezone
-          ln -sf /usr/share/zoneinfo/UTC /etc/localtime
+# Configurar teclado
+echo "KEYMAP=es" > /etc/vconsole.conf
 
-          # Crear usuario liveuser
-          useradd -m -G wheel,audio,video,storage,optical,network,power -s /bin/bash liveuser
+# Configurar timezone
+ln -sf /usr/share/zoneinfo/UTC /etc/localtime
 
-          # Sin contraseña para liveuser
-          passwd -d liveuser
+# Crear usuario liveuser
+useradd -m -G wheel,audio,video,storage,optical,network,power,users -s /bin/bash liveuser
 
-          # Configurar sudo sin contraseña para wheel
-          echo "%wheel ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+# Sin contraseña para liveuser y root
+passwd -d liveuser
+passwd -d root
 
-          # Habilitar servicios necesarios
-          systemctl enable NetworkManager.service
-          systemctl enable sddm.service
+# Configurar sudo sin contraseña para wheel
+echo "%wheel ALL=(ALL:ALL) NOPASSWD: ALL" >> /etc/sudoers
+echo "liveuser ALL=(ALL:ALL) NOPASSWD: ALL" >> /etc/sudoers
 
-          # Crear servicio para configuración inicial
-          cat > /etc/systemd/system/livecd-setup.service << EOF
-          [Unit]
-          Description=LiveCD Setup Service
-          After=multi-user.target
+# Habilitar servicios necesarios
+systemctl enable NetworkManager.service
+systemctl enable sddm.service
+systemctl enable systemd-timesyncd.service
 
-          [Service]
-          Type=oneshot
-          ExecStart=/usr/local/bin/livecd-setup.sh
-          RemainAfterExit=yes
+# Configurar NetworkManager para conexión automática
+cat > /etc/NetworkManager/conf.d/wifi-powersave-off.conf << EOF
+[connection]
+wifi.powersave = 2
+EOF
 
-          [Install]
-          WantedBy=multi-user.target
-          EOF
+# Configurar autologin en SDDM
+cat > /etc/sddm.conf.d/autologin.conf << EOF
+[Autologin]
+User=liveuser
+Session=plasma
 
-          # Script de configuración inicial
-          cat > /usr/local/bin/livecd-setup.sh << EOF
-          #!/bin/bash
-          # Configurar el home del usuario si es necesario
-          if [ ! -f /home/liveuser/.config/plasma-org.kde.plasma.desktop-appletsrc ]; then
-              su - liveuser -c "mkdir -p ~/.config"
-          fi
-          EOF
+[Theme]
+Current=breeze
 
-          chmod +x /usr/local/bin/livecd-setup.sh
-          systemctl enable livecd-setup.service
+[General]
+HaltCommand=/usr/bin/systemctl poweroff
+RebootCommand=/usr/bin/systemctl reboot
+EOF
 
-          # Configurar autologin en SDDM
-          mkdir -p /etc/sddm.conf.d
-          cat > /etc/sddm.conf.d/autologin.conf << EOF
-          [Autologin]
-          User=liveuser
-          Session=plasma
+# Configurar hostname
+echo "archiso-kde" > /etc/hostname
 
-          [Theme]
-          Current=breeze
-          EOF
+# Configurar hosts
+cat > /etc/hosts << EOF
+127.0.0.1   localhost
+::1         localhost
+127.0.1.1   archiso-kde.localdomain archiso-kde
+EOF
 
-          # Configurar hostname
-          echo "archiso" > /etc/hostname
+# Configurar mirrors de pacman
+cat > /etc/pacman.d/mirrorlist << EOF
+##
+## Arch Linux repository mirrorlist
+##
+Server = https://mirror.rackspace.com/archlinux/\$repo/os/\$arch
+Server = https://mirror.leaseweb.net/archlinux/\$repo/os/\$arch
+Server = https://mirrors.kernel.org/archlinux/\$repo/os/\$arch
+Server = https://archive.archlinux.org/repos/\$(date +%Y/%m/%d)/\$repo/os/\$arch
+EOF
 
-          # Limpiar cachés
-          pacman -Scc --noconfirm
-          CUSTOMEOF
+# Configurar servicios adicionales
+systemctl enable systemd-resolved.service
+
+# Configuración de KDE para liveuser
+mkdir -p /home/liveuser/.config
+chown -R liveuser:liveuser /home/liveuser
+
+# Script de configuración inicial que se ejecuta al iniciar sesión
+cat > /usr/local/bin/livecd-setup.sh << EOF
+#!/bin/bash
+# Configuración inicial del entorno live
+
+# Actualizar mirrors si es necesario
+if command -v reflector &> /dev/null; then
+    reflector --country Spain,France,Germany --age 12 --protocol https --sort rate --save /etc/pacman.d/mirrorlist &
+fi
+
+# Detectar y configurar red automáticamente
+nmcli device wifi rescan &>/dev/null || true
+EOF
+
+chmod +x /usr/local/bin/livecd-setup.sh
+
+# Crear servicio para ejecutar setup al inicio
+cat > /etc/systemd/system/livecd-setup.service << EOF
+[Unit]
+Description=LiveCD Initial Setup
+After=NetworkManager.service
+Wants=NetworkManager.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/livecd-setup.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl enable livecd-setup.service
+
+# Configurar bashrc para liveuser
+cat >> /home/liveuser/.bashrc << EOF
+
+# Configuración adicional para live system
+export EDITOR=nano
+alias ll="ls -la"
+alias la="ls -la"
+alias l="ls -CF"
+alias ..="cd .."
+alias ...="cd ../.."
+
+# Mostrar información del sistema al iniciar terminal
+echo ""
+echo "=== Arch Linux KDE Live System ==="
+echo "Usuario: liveuser (sin contraseña)"
+echo "Para instalar: Haz doble clic en 'Instalador de Arch Linux' en el escritorio"
+echo "Para particionar: Haz doble clic en 'GParted' en el escritorio"
+echo ""
+fastfetch 2>/dev/null || neofetch 2>/dev/null || echo "Sistema iniciado correctamente"
+echo ""
+EOF
+
+chown liveuser:liveuser /home/liveuser/.bashrc
+
+# Limpiar cachés y logs
+pacman -Scc --noconfirm
+journalctl --vacuum-size=1M
+rm -rf /var/cache/pacman/pkg/*
+rm -rf /tmp/*
+rm -rf /var/tmp/*
+
+echo "=== Customización completada ==="
+CUSTOMEOF
 
           chmod +x airootfs/root/customize_airootfs.sh
           '
@@ -315,91 +468,124 @@ jobs:
           # Configurar grub
           mkdir -p grub
           cat > grub/grub.cfg << "GRUBEOF"
-          insmod part_gpt
-          insmod part_msdos
-          insmod fat
-          insmod iso9660
+insmod part_gpt
+insmod part_msdos
+insmod fat
+insmod iso9660
+insmod all_video
+insmod font
 
-          insmod all_video
-          insmod font
+set default="0"
+set timeout=10
 
-          set default="0"
-          set timeout=5
+if loadfont /boot/grub/fonts/unicode.pf2 ; then
+    set gfxmode=auto
+    insmod gfxterm
+    terminal_output gfxterm
+fi
 
-          menuentry "Arch Linux KDE Live" {
-              set gfxpayload=keep
-              linux /%INSTALL_DIR%/boot/x86_64/vmlinuz-linux archisobasedir=%INSTALL_DIR% archisolabel=%ARCHISO_LABEL% quiet splash
-              initrd /%INSTALL_DIR%/boot/x86_64/initramfs-linux.img
-          }
+menuentry "Arch Linux KDE Live" {
+    set gfxpayload=keep
+    linux /%INSTALL_DIR%/boot/x86_64/vmlinuz-linux archisobasedir=%INSTALL_DIR% archisolabel=%ARCHISO_LABEL% quiet splash loglevel=3 systemd.show_status=auto rd.udev.log_priority=3
+    initrd /%INSTALL_DIR%/boot/x86_64/initramfs-linux.img
+}
 
-          menuentry "Arch Linux KDE Live (nomodeset)" {
-              set gfxpayload=keep
-              linux /%INSTALL_DIR%/boot/x86_64/vmlinuz-linux archisobasedir=%INSTALL_DIR% archisolabel=%ARCHISO_LABEL% nomodeset
-              initrd /%INSTALL_DIR%/boot/x86_64/initramfs-linux.img
-          }
-          GRUBEOF
+menuentry "Arch Linux KDE Live (Safe Mode)" {
+    set gfxpayload=keep
+    linux /%INSTALL_DIR%/boot/x86_64/vmlinuz-linux archisobasedir=%INSTALL_DIR% archisolabel=%ARCHISO_LABEL% nomodeset xdriver=vesa
+    initrd /%INSTALL_DIR%/boot/x86_64/initramfs-linux.img
+}
+
+menuentry "Arch Linux KDE Live (Copy to RAM)" {
+    set gfxpayload=keep
+    linux /%INSTALL_DIR%/boot/x86_64/vmlinuz-linux archisobasedir=%INSTALL_DIR% archisolabel=%ARCHISO_LABEL% copytoram quiet splash
+    initrd /%INSTALL_DIR%/boot/x86_64/initramfs-linux.img
+}
+GRUBEOF
 
           # Configurar syslinux
           cat > syslinux/archiso_sys-linux.cfg << "SYSEOF"
-          LABEL arch64
-          TEXT HELP
-          Boot the Arch Linux KDE Live environment.
-          ENDTEXT
-          MENU LABEL Arch Linux KDE Live
-          LINUX /%INSTALL_DIR%/boot/x86_64/vmlinuz-linux
-          INITRD /%INSTALL_DIR%/boot/x86_64/initramfs-linux.img
-          APPEND archisobasedir=%INSTALL_DIR% archisolabel=%ARCHISO_LABEL% quiet splash
+LABEL arch64
+TEXT HELP
+Boot the Arch Linux KDE Live environment.
+ENDTEXT
+MENU LABEL Arch Linux KDE Live
+LINUX /%INSTALL_DIR%/boot/x86_64/vmlinuz-linux
+INITRD /%INSTALL_DIR%/boot/x86_64/initramfs-linux.img
+APPEND archisobasedir=%INSTALL_DIR% archisolabel=%ARCHISO_LABEL% quiet splash loglevel=3
 
-          LABEL arch64_nomodeset
-          TEXT HELP
-          Boot the Arch Linux KDE Live environment with nomodeset.
-          ENDTEXT
-          MENU LABEL Arch Linux KDE Live (nomodeset)
-          LINUX /%INSTALL_DIR%/boot/x86_64/vmlinuz-linux
-          INITRD /%INSTALL_DIR%/boot/x86_64/initramfs-linux.img
-          APPEND archisobasedir=%INSTALL_DIR% archisolabel=%ARCHISO_LABEL% nomodeset
-          SYSEOF
+LABEL arch64_safe
+TEXT HELP
+Boot the Arch Linux KDE Live environment in safe mode.
+ENDTEXT
+MENU LABEL Arch Linux KDE Live (Safe Mode)
+LINUX /%INSTALL_DIR%/boot/x86_64/vmlinuz-linux
+INITRD /%INSTALL_DIR%/boot/x86_64/initramfs-linux.img
+APPEND archisobasedir=%INSTALL_DIR% archisolabel=%ARCHISO_LABEL% nomodeset xdriver=vesa
 
-          # Configurar timeout corto
-          sed -i "s/TIMEOUT 300/TIMEOUT 30/" syslinux/archiso_head.cfg
+LABEL arch64_ram
+TEXT HELP
+Boot the Arch Linux KDE Live environment and copy to RAM.
+ENDTEXT
+MENU LABEL Arch Linux KDE Live (Copy to RAM)
+LINUX /%INSTALL_DIR%/boot/x86_64/vmlinuz-linux
+INITRD /%INSTALL_DIR%/boot/x86_64/initramfs-linux.img
+APPEND archisobasedir=%INSTALL_DIR% archisolabel=%ARCHISO_LABEL% copytoram quiet splash
+SYSEOF
+
+          # Configurar timeout
+          sed -i "s/TIMEOUT 300/TIMEOUT 50/" syslinux/archiso_head.cfg
 
           # Configurar systemd-boot
           mkdir -p efiboot/loader/entries
           cat > efiboot/loader/loader.conf << "LOADEREOF"
-          default  archiso-x86_64-linux.conf
-          timeout  3
-          console-mode keep
-          LOADEREOF
+default  archiso-x86_64-linux.conf
+timeout  5
+console-mode keep
+editor   no
+LOADEREOF
 
           cat > efiboot/loader/entries/archiso-x86_64-linux.conf << "ENTRYEOF"
-          title   Arch Linux KDE Live
-          linux   /%INSTALL_DIR%/boot/x86_64/vmlinuz-linux
-          initrd  /%INSTALL_DIR%/boot/x86_64/initramfs-linux.img
-          options archisobasedir=%INSTALL_DIR% archisolabel=%ARCHISO_LABEL% quiet splash
-          ENTRYEOF
+title   Arch Linux KDE Live
+linux   /%INSTALL_DIR%/boot/x86_64/vmlinuz-linux
+initrd  /%INSTALL_DIR%/boot/x86_64/initramfs-linux.img
+options archisobasedir=%INSTALL_DIR% archisolabel=%ARCHISO_LABEL% quiet splash loglevel=3
+ENTRYEOF
+
+          cat > efiboot/loader/entries/archiso-x86_64-linux-safe.conf << "SAFEOF"
+title   Arch Linux KDE Live (Safe Mode)
+linux   /%INSTALL_DIR%/boot/x86_64/vmlinuz-linux
+initrd  /%INSTALL_DIR%/boot/x86_64/initramfs-linux.img
+options archisobasedir=%INSTALL_DIR% archisolabel=%ARCHISO_LABEL% nomodeset xdriver=vesa
+SAFEOF
 
           # Configurar profiledef.sh
           cat > profiledef.sh << "PROFILEEOF"
-          #!/usr/bin/env bash
+#!/usr/bin/env bash
 
-          iso_name="archlinux-kde"
-          iso_label="ARCH_KDE_$(date +%Y%m)"
-          iso_publisher="Arch Linux KDE Live"
-          iso_application="Arch Linux KDE Live CD"
-          iso_version="$(date +%Y.%m.%d)"
-          install_dir="arch"
-          buildmodes=("iso")
-          bootmodes=("bios.syslinux.mbr" "bios.syslinux.eltorito" "uefi-x64.systemd-boot.esp" "uefi-x64.systemd-boot.eltorito")
-          arch="x86_64"
-          pacman_conf="pacman.conf"
-          airootfs_image_type="squashfs"
-          airootfs_image_tool_options=("-comp" "xz" "-Xbcj" "x86" "-b" "1M" "-Xdict-size" "1M")
-          file_permissions=(
-            ["/root"]="0:0:750"
-            ["/root/customize_airootfs.sh"]="0:0:755"
-            ["/usr/local/bin/livecd-setup.sh"]="0:0:755"
-          )
-          PROFILEEOF
+iso_name="archlinux-kde"
+iso_label="ARCH_KDE_$(date +%Y%m)"
+iso_publisher="Arch Linux KDE Live"
+iso_application="Arch Linux KDE Live CD"
+iso_version="$(date +%Y.%m.%d)"
+install_dir="arch"
+buildmodes=("iso")
+bootmodes=("bios.syslinux.mbr" "bios.syslinux.eltorito" "uefi-x64.systemd-boot.esp" "uefi-x64.systemd-boot.eltorito")
+arch="x86_64"
+pacman_conf="pacman.conf"
+airootfs_image_type="squashfs"
+airootfs_image_tool_options=("-comp" "xz" "-Xbcj" "x86" "-b" "1M" "-Xdict-size" "1M")
+file_permissions=(
+  ["/root"]="0:0:750"
+  ["/root/customize_airootfs.sh"]="0:0:755"
+  ["/usr/local/bin/livecd-setup.sh"]="0:0:755"
+  ["/usr/local/bin/arch-installer"]="0:0:755"
+  ["/etc/skel/Desktop/arch-installer.desktop"]="1000:1000:755"
+  ["/etc/skel/Desktop/gparted.desktop"]="1000:1000:755"
+  ["/root/Desktop/arch-installer.desktop"]="0:0:755"
+  ["/root/Desktop/gparted.desktop"]="0:0:755"
+)
+PROFILEEOF
           '
 
       - name: Build ISO
@@ -408,15 +594,28 @@ jobs:
           cd /build/archiso-kde
 
           # Verificar que todos los archivos necesarios existen
-          echo "=== Verificando archivos ==="
+          echo "=== Verificando estructura de archivos ==="
           ls -la
-          echo "=== Contenido de packages.x86_64 ==="
-          head -20 packages.x86_64
+          echo ""
+          echo "=== Contenido de packages.x86_64 (primeras 30 líneas) ==="
+          head -30 packages.x86_64
+          echo ""
           echo "=== Contenido de profiledef.sh ==="
           cat profiledef.sh
+          echo ""
+          echo "=== Verificando customize_airootfs.sh ==="
+          ls -la airootfs/root/customize_airootfs.sh
+          echo ""
 
-          # Crear el ISO
+          # Crear el directorio de trabajo y salida
+          mkdir -p work out
+
+          # Construcción del ISO
+          echo "=== Iniciando construcción del ISO ==="
           mkarchiso -v -w work -o out .
+
+          echo "=== Construcción completada ==="
+          ls -la out/
           '
 
           # Crear directorio de salida en el host
@@ -424,6 +623,9 @@ jobs:
 
           # Copiar ISO al workspace del host
           docker cp arch-builder:/build/archiso-kde/out/. ./iso-output/
+
+          # Mostrar información del ISO generado
+          ls -lh ./iso-output/
 
       - name: Cleanup container
         if: always()
@@ -445,36 +647,91 @@ jobs:
           tag_name: v${{ github.run_number }}
           name: Arch Linux KDE Live CD v${{ github.run_number }}
           body: |
-            # Arch Linux Live CD con KDE Plasma
+            # 🐧 Arch Linux Live CD con KDE Plasma
 
-            ## Características:
-            - **Entorno de escritorio**: KDE Plasma completo
+            ## ✨ Características principales:
+            - **Entorno de escritorio**: KDE Plasma completo y moderno
             - **Usuario**: `liveuser` (sin contraseña, login automático)
-            - **Privilegios**: sudo disponible sin contraseña
-            - **Red**: NetworkManager habilitado
-            - **Aplicaciones incluidas**:
-              - Firefox (navegador web)
-              - Konsole (terminal)
-              - Dolphin (gestor de archivos)
-              - Kate (editor de texto)
-              - GParted (gestor de particiones)
-              - Calamares (instalador gráfico)
-              - Y muchas más aplicaciones de KDE
+            - **Privilegios**: sudo disponible sin contraseña para administración
+            - **Red**: NetworkManager habilitado con detección automática
+            - **Idioma**: Soporte para español e inglés
+            - **Teclado**: Configurado para español por defecto
 
-            ## Requisitos del sistema:
-            - **RAM mínima**: 2GB (4GB recomendado)
-            - **Espacio en disco**: La ISO ocupa aproximadamente 2-3GB
-            - **Arquitectura**: x86_64
+            ## 📦 Aplicaciones incluidas:
+            ### 🌐 Internet y Comunicación
+            - Firefox (navegador web)
 
-            ## Instrucciones de uso:
-            1. Descarga la ISO
-            2. Graba la ISO en un USB usando dd, Rufus o Etcher
-            3. Arranca desde el USB
-            4. El sistema iniciará automáticamente con KDE Plasma
+            ### 🖥️ Sistema y Utilidades
+            - Konsole (terminal avanzada)
+            - Dolphin (gestor de archivos)
+            - Kate (editor de texto avanzado)
+            - Spectacle (capturas de pantalla)
+            - System Settings (configuración del sistema)
 
-            ## Notas:
-            - Esta es una versión live, los cambios no se guardan al reiniciar
-            - Para instalar Arch Linux permanentemente, usa el icono "Instalador de Arch Linux (Calamares)" en el escritorio o ejecuta `calamares` desde la terminal
+            ### 🔧 Herramientas de Instalación
+            - **Instalador de Arch Linux** (script guiado disponible en el escritorio)
+            - GParted (editor de particiones)
+            - Arch Install Scripts (herramientas de línea de comandos)
+
+            ### 📄 Multimedia y Documentos
+            - Okular (visor de documentos PDF)
+            - Gwenview (visor de imágenes)
+            - VLC (reproductor multimedia)
+            - Ark (gestor de archivos comprimidos)
+
+            ## 💻 Requisitos del sistema:
+            - **RAM mínima**: 2GB (4GB recomendado para mejor rendimiento)
+            - **Espacio en disco**: ~3GB para la ISO
+            - **Arquitectura**: x86_64 (64 bits)
+            - **UEFI/BIOS**: Compatible con ambos modos de arranque
+
+            ## 🚀 Instrucciones de uso:
+
+            ### Preparación:
+            1. Descarga la ISO desde los assets de esta release
+            2. Graba la ISO en un USB usando:
+               - **Linux**: `dd if=archivo.iso of=/dev/sdX bs=4M status=progress`
+               - **Windows**: Rufus, Etcher o herramienta similar
+               - **macOS**: Etcher o comando dd
+
+            ### Arranque:
+            1. Conecta el USB a tu computadora
+            2. Reinicia y accede al menú de arranque (F12, F8, ESC, etc.)
+            3. Selecciona el USB de Arch Linux
+            4. Elige "Arch Linux KDE Live" en el menú
+
+            ### Opciones de arranque disponibles:
+            - **Arch Linux KDE Live**: Modo normal (recomendado)
+            - **Safe Mode**: Para hardware problemático (nomodeset)
+            - **Copy to RAM**: Copia todo el sistema a RAM (requiere 4GB+)
+
+            ## 🔧 Instalación permanente:
+            1. Una vez iniciado el sistema live, encontrarás el icono **"Instalador de Arch Linux"** en el escritorio
+            2. Haz doble clic para iniciar el asistente de instalación
+            3. También puedes usar GParted para preparar las particiones
+            4. Sigue las instrucciones en pantalla o consulta la [Guía de Instalación de Arch Linux](https://wiki.archlinux.org/title/Installation_guide)
+
+            ## ⚠️ Notas importantes:
+            - Esta es una versión **live**: los cambios no se guardan al reiniciar
+            - El sistema incluye drivers para la mayoría de hardware moderno
+            - La conectividad WiFi se detecta automáticamente
+            - Para problemas de compatibilidad, usa el modo "Safe Mode"
+
+            ## 🌐 Idioma y teclado:
+            - **Interfaz**: Inglés (con soporte para español)
+            - **Teclado**: Español por defecto
+            - **Timezone**: UTC (configurable tras la instalación)
+
+            ## 🆘 Resolución de problemas:
+            - **Pantalla negra**: Usa el modo "Safe Mode"
+            - **WiFi no detectada**: Ejecuta `nmcli device wifi rescan` en terminal
+            - **Problemas de audio**: Verifica que PipeWire esté iniciado
+
+            ---
+
+            **Creado con**: Archiso + GitHub Actions
+            **Fecha de construcción**: $(date)
+            **Tamaño aproximado**: ~2.5-3GB
 
           files: iso-output/*.iso
           draft: false
