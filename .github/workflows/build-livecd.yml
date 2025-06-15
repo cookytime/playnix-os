@@ -28,29 +28,33 @@ jobs:
           sudo apt-get clean
           df -h
 
-      - name: Install archiso and dependencies
+      - name: Setup Arch Linux container
         run: |
-          sudo apt-get update
-          sudo apt-get install -y arch-install-scripts squashfs-tools libisoburn1
+          # Descargar imagen de Arch Linux
+          docker pull archlinux:latest
 
-          # Instalar archiso desde AUR manualmente
-          wget https://gitlab.archlinux.org/archlinux/archiso/-/archive/master/archiso-master.tar.gz
-          tar -xzf archiso-master.tar.gz
-          cd archiso-master
-          sudo make install
-          cd ..
+          # Crear contenedor con privilegios necesarios
+          docker run -d --name arch-builder --privileged \
+            -v ${{ github.workspace }}:/workspace \
+            archlinux:latest sleep infinity
+
+          # Actualizar sistema y instalar dependencias
+          docker exec arch-builder pacman -Syu --noconfirm
+          docker exec arch-builder pacman -S --noconfirm archiso git base-devel
 
       - name: Create archiso profile
         run: |
+          # Ejecutar dentro del contenedor de Arch
+          docker exec -w /workspace arch-builder bash -c '
           # Crear directorio de trabajo
           mkdir -p archiso-kde
           cd archiso-kde
 
-          # Copiar perfil base
+          # Copiar perfil base de archiso
           cp -r /usr/share/archiso/configs/releng/* .
 
           # Crear lista de paquetes personalizada
-          cat > packages.x86_64 << 'EOF'
+          cat > packages.x86_64 << "EOF"
           # Base system
           base
           base-devel
@@ -108,14 +112,14 @@ jobs:
           ttf-liberation
           noto-fonts
           EOF
+          '
 
       - name: Configure automatic login
         run: |
-          cd archiso-kde
-
+          docker exec -w /workspace/archiso-kde arch-builder bash -c '
           # Crear configuración de SDDM para autologin
           mkdir -p airootfs/etc/sddm.conf.d
-          cat > airootfs/etc/sddm.conf.d/autologin.conf << 'EOF'
+          cat > airootfs/etc/sddm.conf.d/autologin.conf << "EOF"
           [Autologin]
           User=liveuser
           Session=plasma
@@ -123,12 +127,12 @@ jobs:
 
           # Crear usuario liveuser
           mkdir -p airootfs/etc
-          cat > airootfs/etc/passwd << 'EOF'
+          cat > airootfs/etc/passwd << "EOF"
           root:x:0:0:root:/root:/bin/bash
           liveuser:x:1000:1000:Live User:/home/liveuser:/bin/bash
           EOF
 
-          cat > airootfs/etc/group << 'EOF'
+          cat > airootfs/etc/group << "EOF"
           root:x:0:
           wheel:x:1:liveuser
           audio:x:92:liveuser
@@ -145,7 +149,7 @@ jobs:
 
           # Script de customización
           mkdir -p airootfs/root
-          cat > airootfs/root/customize_airootfs.sh << 'EOF'
+          cat > airootfs/root/customize_airootfs.sh << "EOF"
           #!/bin/bash
 
           # Habilitar servicios
@@ -163,9 +167,9 @@ jobs:
 
           # Configurar KDE para liveuser
           mkdir -p /home/liveuser/.config
-          cat > /home/liveuser/.config/startupconfig << 'KDEEOF'
-          kcminputrc Mouse cursorTheme 'breeze_cursors'
-          kcminputrc Mouse cursorSize ''
+          cat > /home/liveuser/.config/startupconfig << "KDEEOF"
+          kcminputrc Mouse cursorTheme "breeze_cursors"
+          kcminputrc Mouse cursorSize ""
           kwinrc Compositing Enabled true
           kwinrc Compositing AnimationSpeed 3
           KDEEOF
@@ -183,14 +187,14 @@ jobs:
           EOF
 
           chmod +x airootfs/root/customize_airootfs.sh
+          '
 
       - name: Configure boot parameters
         run: |
-          cd archiso-kde
-
+          docker exec -w /workspace/archiso-kde arch-builder bash -c '
           # Configurar GRUB para arranque automático
           mkdir -p efiboot/loader/entries
-          cat > efiboot/loader/entries/archiso-x86_64-linux.conf << 'EOF'
+          cat > efiboot/loader/entries/archiso-x86_64-linux.conf << "EOF"
           title   Arch Linux KDE Live
           linux   /arch/boot/x86_64/vmlinuz-linux
           initrd  /arch/boot/x86_64/initramfs-linux.img
@@ -198,24 +202,34 @@ jobs:
           EOF
 
           # Configurar syslinux
-          sed -i 's/TIMEOUT 300/TIMEOUT 30/g' syslinux/archiso_sys-linux.cfg
-          sed -i 's/archisobasedir=arch/archisobasedir=arch quiet splash/g' syslinux/archiso_sys-linux.cfg
+          sed -i "s/TIMEOUT 300/TIMEOUT 30/g" syslinux/archiso_sys-linux.cfg
+          sed -i "s/archisobasedir=arch/archisobasedir=arch quiet splash/g" syslinux/archiso_sys-linux.cfg
+          '
 
       - name: Build ISO
         run: |
-          cd archiso-kde
-
+          docker exec -w /workspace/archiso-kde arch-builder bash -c '
           # Crear el ISO
-          sudo mkarchiso -v -w work -o out .
+          mkarchiso -v -w work -o out .
 
           # Listar archivos generados
           ls -la out/
+          '
+
+          # Copiar ISO al workspace del host
+          mkdir -p /workspace/iso-output
+          docker cp arch-builder:/workspace/archiso-kde/out/. ./iso-output/
+
+      - name: Cleanup container
+        run: |
+          docker stop arch-builder
+          docker rm arch-builder
 
       - name: Upload ISO artifact
         uses: actions/upload-artifact@v4
         with:
           name: arch-kde-livecd
-          path: archiso-kde/out/*.iso
+          path: iso-output/*.iso
           retention-days: 30
 
       - name: Create Release
@@ -238,7 +252,7 @@ jobs:
             Usuario: liveuser (sin contraseña)
             Sudo disponible sin contraseña
 
-          files: archiso-kde/out/*.iso
+          files: iso-output/*.iso
           draft: false
           prerelease: false
         env:
