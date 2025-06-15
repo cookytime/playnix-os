@@ -591,61 +591,61 @@ jobs:
           systemctl enable sddm.service
 
           # Crear servicio para configuración inicial
-          cat > /etc/systemd/system/livecd-setup.service << EOF
-          [Unit]
-          Description=LiveCD Setup Service
-          After=multi-user.target
+          cat > /etc/systemd/system/livecd-setup.service << SERVICEEOF
+[Unit]
+Description=LiveCD Setup Service
+After=multi-user.target
 
-          [Service]
-          Type=oneshot
-          ExecStart=/usr/local/bin/livecd-setup.sh
-          RemainAfterExit=yes
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/livecd-setup.sh
+RemainAfterExit=yes
 
-          [Install]
-          WantedBy=multi-user.target
-          EOF
+[Install]
+WantedBy=multi-user.target
+SERVICEEOF
 
           # Script de configuración inicial
-          cat > /usr/local/bin/livecd-setup.sh << EOF
-          #!/bin/bash
-          # Asegurar que el icono del instalador sea visible y ejecutable
-          if [ -f /home/liveuser/Desktop/calamares.desktop ]; then
-              chmod +x /home/liveuser/Desktop/calamares.desktop
-              chown liveuser:liveuser /home/liveuser/Desktop/calamares.desktop
-          fi
+          cat > /usr/local/bin/livecd-setup.sh << SETUPEOF
+#!/bin/bash
+# Asegurar que el icono del instalador sea visible y ejecutable
+if [ -f /home/liveuser/Desktop/calamares.desktop ]; then
+    chmod +x /home/liveuser/Desktop/calamares.desktop
+    chown liveuser:liveuser /home/liveuser/Desktop/calamares.desktop
+fi
 
-          # Configurar permisos para Calamares
-          if [ -f /usr/bin/calamares ]; then
-              chmod +x /usr/bin/calamares
-          fi
-          EOF
+# Configurar permisos para Calamares
+if [ -f /usr/bin/calamares ]; then
+    chmod +x /usr/bin/calamares
+fi
+SETUPEOF
 
           chmod +x /usr/local/bin/livecd-setup.sh
           systemctl enable livecd-setup.service
 
           # Configurar autologin en SDDM
           mkdir -p /etc/sddm.conf.d
-          cat > /etc/sddm.conf.d/autologin.conf << EOF
-          [Autologin]
-          User=liveuser
-          Session=plasma
+          cat > /etc/sddm.conf.d/autologin.conf << SDDMEOF
+[Autologin]
+User=liveuser
+Session=plasma
 
-          [Theme]
-          Current=breeze
-          EOF
+[Theme]
+Current=breeze
+SDDMEOF
 
           # Configurar hostname
           echo "archiso" > /etc/hostname
 
           # Configurar polkit para permitir a liveuser ejecutar calamares
           mkdir -p /etc/polkit-1/rules.d/
-          cat > /etc/polkit-1/rules.d/49-nopasswd_calamares.rules << EOF
-          polkit.addRule(function(action, subject) {
-              if (subject.user == "liveuser") {
-                  return polkit.Result.YES;
-              }
-          });
-          EOF
+          cat > /etc/polkit-1/rules.d/49-nopasswd_calamares.rules << POLKITEOF
+polkit.addRule(function(action, subject) {
+    if (subject.user == "liveuser") {
+        return polkit.Result.YES;
+    }
+});
+POLKITEOF
 
           # Limpiar cachés
           pacman -Scc --noconfirm
