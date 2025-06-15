@@ -129,6 +129,15 @@ jobs:
           curl
           rsync
 
+          # Installer
+          calamares
+          calamares-qt5
+          boost-libs
+          kpmcore
+          yaml-cpp
+          parted
+          squashfs-tools
+
           # Fonts
           ttf-dejavu
           ttf-liberation
@@ -187,9 +196,368 @@ jobs:
 
           # Crear estructura de directorios necesaria
           mkdir -p airootfs/etc/skel
+          mkdir -p airootfs/etc/skel/Desktop
           mkdir -p airootfs/etc/systemd/system
           mkdir -p airootfs/etc/sddm.conf.d
           mkdir -p airootfs/root
+          mkdir -p airootfs/etc/calamares
+          mkdir -p airootfs/etc/calamares/modules
+          mkdir -p airootfs/etc/calamares/branding/archlinux
+          mkdir -p airootfs/usr/share/applications
+          mkdir -p airootfs/usr/share/pixmaps
+
+          # Crear configuración principal de Calamares
+          cat > airootfs/etc/calamares/settings.conf << "CALAMARESCONF"
+          ---
+          modules-search: [ local ]
+
+          instances:
+          - id:       before
+            module:   shellprocess
+            config:   shellprocess-before.conf
+          - id:       after
+            module:   shellprocess
+            config:   shellprocess-after.conf
+
+          sequence:
+          - show:
+            - welcome
+            - locale
+            - keyboard
+            - partition
+            - users
+            - summary
+          - exec:
+            - partition
+            - mount
+            - unpackfs
+            - machineid
+            - fstab
+            - locale
+            - keyboard
+            - localecfg
+            - initcpioconf
+            - initcpio
+            - users
+            - displaymanager
+            - networkcfg
+            - hwclock
+            - services-systemd
+            - shellprocess@before
+            - packages
+            - removeuser
+            - shellprocess@after
+            - umount
+          - show:
+            - finished
+
+          branding: archlinux
+
+          prompt-install: true
+
+          dont-chroot: false
+
+          disable-cancel: false
+
+          disable-cancel-during-exec: false
+
+          hide-back-and-next-during-exec: false
+
+          quit-at-end: false
+          CALAMARESCONF
+
+          # Configurar módulos de Calamares
+          cat > airootfs/etc/calamares/modules/welcome.conf << "WELCOMECONF"
+          ---
+          showSupportUrl:         true
+          showKnownIssuesUrl:     true
+          showReleaseNotesUrl:    false
+
+          requirements:
+              requiredStorage:    10.0
+              requiredRam:        1.0
+              internetCheckUrl:   http://google.com
+              check:
+                  - storage
+                  - ram
+                  - power
+                  - internet
+                  - root
+              required:
+                  - storage
+                  - ram
+                  - root
+          WELCOMECONF
+
+          cat > airootfs/etc/calamares/modules/partition.conf << "PARTITIONCONF"
+          ---
+          efiSystemPartition:     "/boot/efi"
+          efiSystemPartitionSize:     512M
+          efiSystemPartitionName:     EFI
+          userSwapChoices:
+              - none
+              - small
+              - suspend
+              - file
+          drawNestedPartitions:   false
+          alwaysShowPartitionLabels: true
+          initialPartitioningChoice: alongside
+          initialSwapChoice: none
+          defaultFileSystemType:  "ext4"
+          availableFileSystemTypes:  ["ext4", "btrfs", "xfs", "f2fs"]
+          PARTITIONCONF
+
+          cat > airootfs/etc/calamares/modules/users.conf << "USERSCONF"
+          ---
+          defaultGroups:
+              - name: users
+                must_exist: true
+                system: true
+              - lp
+              - video
+              - network
+              - storage
+              - wheel
+              - audio
+          autologinGroup:  autologin
+          doAutologin:     false
+          sudoersGroup:    wheel
+          setRootPassword: true
+          doReusePassword: false
+          passwordRequirements:
+              nonempty: true
+              minLength: 1
+          userShell: /bin/bash
+          USERSCONF
+
+          cat > airootfs/etc/calamares/modules/displaymanager.conf << "DISPLAYCONF"
+          ---
+          displaymanagers:
+            - sddm
+
+          defaultDesktopEnvironment:
+              executable: "startplasma-x11"
+              desktopFile: "plasma"
+
+          basicSetup: true
+          sysconfigSetup: true
+          DISPLAYCONF
+
+          cat > airootfs/etc/calamares/modules/packages.conf << "PACKAGESCONF"
+          ---
+          backend: pacman
+
+          update_db: true
+          update_system: false
+
+          operations:
+            - install:
+              - base-devel
+              - linux-headers
+              - networkmanager
+              - firefox
+              - konsole
+              - dolphin
+              - kate
+            - remove:
+              - calamares
+              - calamares-qt5
+              - boost-libs
+              - yaml-cpp
+              - kpmcore
+              - mkinitcpio-archiso
+          PACKAGESCONF
+
+          cat > airootfs/etc/calamares/modules/unpackfs.conf << "UNPACKFSCONF"
+          ---
+          unpack:
+              - source: "/run/archiso/bootmnt/arch/x86_64/airootfs.sfs"
+                sourcefs: "squashfs"
+                destination: ""
+          UNPACKFSCONF
+
+          cat > airootfs/etc/calamares/modules/finished.conf << "FINISHEDCONF"
+          ---
+          restartNowEnabled: true
+          restartNowChecked: false
+          restartNowCommand: "systemctl -i reboot"
+          FINISHEDCONF
+
+          # Configurar shellprocess
+          cat > airootfs/etc/calamares/modules/shellprocess-before.conf << "SHELLBEFORE"
+          ---
+          dontChroot: false
+          timeout: 999
+          script:
+              - command: "pacman-key --init"
+              - command: "pacman-key --populate archlinux"
+          SHELLBEFORE
+
+          cat > airootfs/etc/calamares/modules/shellprocess-after.conf << "SHELLAFTER"
+          ---
+          dontChroot: false
+          timeout: 999
+          script:
+              - command: "systemctl enable NetworkManager"
+              - command: "systemctl enable sddm"
+          SHELLAFTER
+
+          # Crear otros módulos necesarios
+          cat > airootfs/etc/calamares/modules/machineid.conf << "MACHINEIDCONF"
+          ---
+          systemd: true
+          dbus: true
+          symlink: true
+          MACHINEIDCONF
+
+          cat > airootfs/etc/calamares/modules/locale.conf << "LOCALECONF"
+          ---
+          region:                  "Europe"
+          zone:                    "Madrid"
+          localeGenPath:           "/etc/locale.gen"
+          geoip:
+              style:    "json"
+              url:      "https://geoip.kde.org/v1/calamares"
+              selector: "timezone"
+          LOCALECONF
+
+          cat > airootfs/etc/calamares/modules/keyboard.conf << "KEYBOARDCONF"
+          ---
+          keyboardLayout: "es"
+          keyboardVariant: ""
+          KEYBOARDCONF
+
+          cat > airootfs/etc/calamares/modules/services-systemd.conf << "SERVICESCONF"
+          ---
+          services:
+            - name: "NetworkManager"
+              mandatory: true
+            - name: "sddm"
+              mandatory: true
+          SERVICESCONF
+
+          cat > airootfs/etc/calamares/modules/removeuser.conf << "REMOVEUSERCONF"
+          ---
+          username: liveuser
+          REMOVEUSERCONF
+
+          cat > airootfs/etc/calamares/modules/initcpioconf.conf << "INITCPIOCONF"
+          ---
+          kernel: linux
+          INITCPIOCONF
+
+          cat > airootfs/etc/calamares/modules/fstab.conf << "FSTABCONF"
+          ---
+          mountOptions:
+              default: defaults,noatime
+              btrfs: defaults,noatime,compress=zstd
+          ssdExtraMountOptions:
+              ext4: discard
+              btrfs: discard=async,ssd
+          crypttabOptions: luks,keyscript=/bin/cat
+          FSTABCONF
+
+          cat > airootfs/etc/calamares/modules/mount.conf << "MOUNTCONF"
+          ---
+          extraMounts:
+              - device: proc
+                fs: proc
+                mountPoint: /proc
+              - device: sys
+                fs: sysfs
+                mountPoint: /sys
+              - device: /dev
+                mountPoint: /dev
+                options: bind
+              - device: tmpfs
+                fs: tmpfs
+                mountPoint: /run
+              - device: /run/udev
+                mountPoint: /run/udev
+                options: bind
+          MOUNTCONF
+
+          cat > airootfs/etc/calamares/modules/localecfg.conf << "LOCALECFGCONF"
+          ---
+          writeLocaleConfig: true
+          LOCALECFGCONF
+
+          cat > airootfs/etc/calamares/modules/networkcfg.conf << "NETWORKCFGCONF"
+          ---
+          backend: nm
+          NETWORKCFGCONF
+
+          cat > airootfs/etc/calamares/modules/hwclock.conf << "HWCLOCKCONF"
+          ---
+          hwclock: UTC
+          HWCLOCKCONF
+
+          # Crear branding básico
+          cat > airootfs/etc/calamares/branding/archlinux/branding.desc << "BRANDINGCONF"
+          ---
+          componentName:  archlinux
+
+          welcomeStyleCalamares:   false
+
+          strings:
+              productName:         "Arch Linux"
+              shortProductName:    "Arch"
+              version:             "Rolling"
+              shortVersion:        "Rolling"
+              versionedName:       "Arch Linux"
+              shortVersionedName:  "Arch"
+              bootloaderEntryName: "Arch Linux"
+              productUrl:          "https://archlinux.org/"
+              supportUrl:          "https://wiki.archlinux.org/"
+              knownIssuesUrl:      "https://bugs.archlinux.org/"
+              releaseNotesUrl:     "https://archlinux.org/news/"
+              donateUrl:           "https://archlinux.org/donate/"
+
+          images:
+              productLogo:         "archlinux-logo.png"
+              productIcon:         "archlinux-icon.png"
+              productWelcome:      "welcome.png"
+
+          slideshow:               "show.qml"
+
+          style:
+             sidebarBackground:    "#2e3440"
+             sidebarText:          "#FFFFFF"
+             sidebarTextSelect:    "#4c566a"
+             sidebarTextHighlight: "#5e81ac"
+          BRANDINGCONF
+
+          # Crear archivo .desktop para el instalador
+          cat > airootfs/usr/share/applications/calamares.desktop << "DESKTOPFILE"
+          [Desktop Entry]
+          Type=Application
+          Version=1.0
+          Name=Install Arch Linux
+          Name[es]=Instalar Arch Linux
+          GenericName=System Installer
+          GenericName[es]=Instalador del Sistema
+          Comment=Install Arch Linux to your computer
+          Comment[es]=Instala Arch Linux en tu computadora
+          Icon=calamares
+          Exec=sudo /usr/bin/calamares
+          Terminal=false
+          StartupNotify=true
+          Categories=Qt;System;
+          X-AppStream-Ignore=true
+          DESKTOPFILE
+
+          # Copiar el .desktop al escritorio del usuario
+          cp airootfs/usr/share/applications/calamares.desktop airootfs/etc/skel/Desktop/
+          chmod +x airootfs/etc/skel/Desktop/calamares.desktop
+
+          # Crear un icono simple para Calamares (usaremos el icono de Arch)
+          cat > airootfs/usr/share/pixmaps/calamares.svg << "CALAMARESICON"
+          <?xml version="1.0" encoding="UTF-8"?>
+          <svg width="64" height="64" version="1.1" xmlns="http://www.w3.org/2000/svg">
+            <rect width="64" height="64" rx="8" fill="#1793d1"/>
+            <text x="32" y="40" text-anchor="middle" font-family="sans-serif" font-size="28" font-weight="bold" fill="white">A</text>
+          </svg>
+          CALAMARESICON
 
           # Script de customización principal
           cat > airootfs/root/customize_airootfs.sh << "CUSTOMEOF"
@@ -240,9 +608,15 @@ jobs:
           # Script de configuración inicial
           cat > /usr/local/bin/livecd-setup.sh << EOF
           #!/bin/bash
-          # Configurar el home del usuario si es necesario
-          if [ ! -f /home/liveuser/.config/plasma-org.kde.plasma.desktop-appletsrc ]; then
-              su - liveuser -c "mkdir -p ~/.config"
+          # Asegurar que el icono del instalador sea visible y ejecutable
+          if [ -f /home/liveuser/Desktop/calamares.desktop ]; then
+              chmod +x /home/liveuser/Desktop/calamares.desktop
+              chown liveuser:liveuser /home/liveuser/Desktop/calamares.desktop
+          fi
+
+          # Configurar permisos para Calamares
+          if [ -f /usr/bin/calamares ]; then
+              chmod +x /usr/bin/calamares
           fi
           EOF
 
@@ -262,6 +636,16 @@ jobs:
 
           # Configurar hostname
           echo "archiso" > /etc/hostname
+
+          # Configurar polkit para permitir a liveuser ejecutar calamares
+          mkdir -p /etc/polkit-1/rules.d/
+          cat > /etc/polkit-1/rules.d/49-nopasswd_calamares.rules << EOF
+          polkit.addRule(function(action, subject) {
+              if (subject.user == "liveuser") {
+                  return polkit.Result.YES;
+              }
+          });
+          EOF
 
           # Limpiar cachés
           pacman -Scc --noconfirm
@@ -404,7 +788,57 @@ jobs:
           path: iso-output/*.iso
           retention-days: 30
 
+      - name: Split ISO for release
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          cd iso-output
+          ISO_FILE=$(ls *.iso | head -1)
+
+          # Si el archivo es mayor a 2GB, dividirlo
+          FILE_SIZE=$(stat -c%s "$ISO_FILE")
+          if [ $FILE_SIZE -gt 2147483648 ]; then
+            echo "ISO size is $FILE_SIZE bytes, splitting into 1.9GB parts..."
+            split -b 1900M "$ISO_FILE" "${ISO_FILE}.part"
+            rm "$ISO_FILE"
+
+            # Crear script para unir las partes
+            cat > join-iso.sh << 'EOF'
+#!/bin/bash
+echo "Joining ISO parts..."
+cat *.iso.part* > archlinux-kde.iso
+echo "ISO reconstructed as archlinux-kde.iso"
+echo "You can verify with: sha256sum archlinux-kde.iso"
+EOF
+            chmod +x join-iso.sh
+
+            # Crear checksum
+            sha256sum *.iso.part* > sha256sums.txt
+          fi
+
+          ls -la
+
       - name: Create Release
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          # Obtener información del ISO
+          cd iso-output
+          ISO_FILE=$(ls *.iso | head -1)
+          ISO_SIZE=$(du -h "$ISO_FILE" | cut -f1)
+          ISO_SHA256=$(sha256sum "$ISO_FILE" | cut -d' ' -f1)
+
+          # Crear archivo de información
+          cat > README.txt << EOF
+          Arch Linux KDE Live CD v${{ github.run_number }}
+
+          ISO: $ISO_FILE
+          Size: $ISO_SIZE
+          SHA256: $ISO_SHA256
+
+          La ISO es demasiado grande para GitHub Releases.
+          Por favor, descárguela desde los Artifacts de este workflow.
+          EOF
+
+      - name: Create Release (Info Only)
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: softprops/action-gh-release@v1
         with:
@@ -413,35 +847,22 @@ jobs:
           body: |
             # Arch Linux Live CD con KDE Plasma
 
+            ## ⚠️ Descarga
+            **La ISO es demasiado grande para GitHub Releases (>2GB).**
+
+            Por favor, descárguela desde:
+            - **GitHub Actions Artifacts**: Ve a la pestaña Actions → Selecciona este workflow → Descarga "arch-kde-livecd"
+            - **Validez**: Los artifacts se mantienen por 30 días
+
             ## Características:
-            - **Entorno de escritorio**: KDE Plasma completo
+            - **Entorno de escritorio**: KDE Plasma
             - **Usuario**: `liveuser` (sin contraseña, login automático)
-            - **Privilegios**: sudo disponible sin contraseña
-            - **Red**: NetworkManager habilitado
-            - **Aplicaciones incluidas**:
-              - Firefox (navegador web)
-              - Konsole (terminal)
-              - Dolphin (gestor de archivos)
-              - Kate (editor de texto)
-              - GParted (gestor de particiones)
-              - Y muchas más aplicaciones de KDE
+            - **Tamaño de ISO**: ~3.2 GB
 
-            ## Requisitos del sistema:
-            - **RAM mínima**: 2GB (4GB recomendado)
-            - **Espacio en disco**: La ISO ocupa aproximadamente 2-3GB
-            - **Arquitectura**: x86_64
+            ## Información técnica:
+            Ver README.txt para detalles de checksum y tamaño exacto.
 
-            ## Instrucciones de uso:
-            1. Descarga la ISO
-            2. Graba la ISO en un USB usando dd, Rufus o Etcher
-            3. Arranca desde el USB
-            4. El sistema iniciará automáticamente con KDE Plasma
-
-            ## Notas:
-            - Esta es una versión live, los cambios no se guardan al reiniciar
-            - Para instalar Arch Linux permanentemente, usa `archinstall` desde la terminal
-
-          files: iso-output/*.iso
+          files: iso-output/README.txt
           draft: false
           prerelease: false
         env:
