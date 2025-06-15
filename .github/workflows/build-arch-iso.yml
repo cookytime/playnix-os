@@ -23,15 +23,24 @@ jobs:
             -v "${{ github.workspace }}:/workspace" \
             -w /workspace \
             archlinux:latest \
-            bash -c "\
-              pacman-key --init && pacman-key --populate archlinux && \
-              pacman -Sy --noconfirm archiso git && \
-              rm -rf /tmp/build-releng && mkdir -p /tmp/build-releng && \
-              cp -r /usr/share/archiso/configs/releng/* /tmp/build-releng/ && \
-              cp -r ./overlay/airootfs/* /tmp/build-releng/airootfs/ && \
-              cp -r ./overlay/syslinux/* /tmp/build-releng/syslinux/ && \
-              rm -rf /tmp/archiso-work out && \
-              mkarchiso -v -w /tmp/archiso-work -o out /tmp/build-releng"
+            bash -c "
+              set -e
+              pacman-key --init
+              pacman-key --populate archlinux
+              pacman -Sy --noconfirm archiso git
+              rm -rf /tmp/build-releng && mkdir -p /tmp/build-releng
+              cp -r /usr/share/archiso/configs/releng/* /tmp/build-releng/
+              # Añade paquetes al final de packages.x86_64
+              echo plasma-meta sddm konsole dolphin networkmanager firefox >> /tmp/build-releng/packages.x86_64
+              # Aplica overlays si tienes
+              cp -rn ./overlay/airootfs/* /tmp/build-releng/airootfs/ || true
+              cp -rn ./overlay/syslinux/* /tmp/build-releng/syslinux/ || true
+              # Symlink para que arranque KDE automáticamente
+              mkdir -p /tmp/build-releng/airootfs/etc/systemd/system/multi-user.target.wants/
+              ln -sf /usr/lib/systemd/system/sddm.service /tmp/build-releng/airootfs/etc/systemd/system/multi-user.target.wants/sddm.service
+              rm -rf /tmp/archiso-work out
+              mkarchiso -v -w /tmp/archiso-work -o out /tmp/build-releng
+            "
 
       - name: Fix permissions on output directory
         run: |
