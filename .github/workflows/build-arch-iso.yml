@@ -25,19 +25,25 @@ jobs:
             archlinux:latest \
             bash -c "
               set -e
+              # Actualiza mirrorlist y cache de paquetes
+              curl -o /etc/pacman.d/mirrorlist 'https://archlinux.org/mirrorlist/?country=ES&protocol=https&use_mirror_status=on'
+              sed -i 's/^#Server/Server/' /etc/pacman.d/mirrorlist
+              pacman -Syyu --noconfirm
               pacman-key --init
               pacman-key --populate archlinux
               pacman -Sy --noconfirm archiso git
               rm -rf /tmp/build-releng && mkdir -p /tmp/build-releng
               cp -r /usr/share/archiso/configs/releng/* /tmp/build-releng/
-              # Añade paquetes al final de packages.x86_64
+              # Añade KDE Plasma y apps al final de la lista de paquetes
               echo plasma-meta sddm konsole dolphin networkmanager firefox >> /tmp/build-releng/packages.x86_64
-              # Aplica overlays si tienes
+              # Aplica tus overlays (si existen)
               cp -rn ./overlay/airootfs/* /tmp/build-releng/airootfs/ || true
               cp -rn ./overlay/syslinux/* /tmp/build-releng/syslinux/ || true
-              # Symlink para que arranque KDE automáticamente
+              # Habilita sddm al inicio creando el symlink necesario
               mkdir -p /tmp/build-releng/airootfs/etc/systemd/system/multi-user.target.wants/
               ln -sf /usr/lib/systemd/system/sddm.service /tmp/build-releng/airootfs/etc/systemd/system/multi-user.target.wants/sddm.service
+              # (Opcional, muestra la lista de paquetes en logs para depuración)
+              echo 'Contenido final de packages.x86_64:' && cat /tmp/build-releng/packages.x86_64
               rm -rf /tmp/archiso-work out
               mkarchiso -v -w /tmp/archiso-work -o out /tmp/build-releng
             "
