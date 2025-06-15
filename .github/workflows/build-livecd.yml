@@ -15,19 +15,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Free up disk space
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-          sudo apt-get remove -y '^dotnet-.*'
-          sudo apt-get remove -y '^llvm-.*'
-          sudo apt-get remove -y 'php.*'
-          sudo apt-get autoremove -y
-          sudo apt-get clean
-          df -h
-
       - name: Setup Arch Linux container
         run: |
           # Descargar imagen de Arch Linux
@@ -73,7 +60,7 @@ jobs:
           # KDE Plasma
           plasma-meta
           kde-applications-meta
-          plasma-wayland-session
+          plasma-wayland-protocols
 
           # Display manager
           sddm
@@ -102,7 +89,7 @@ jobs:
 
           # System tools
           htop
-          neofetch
+          fastfetch
           git
           vim
           nano
