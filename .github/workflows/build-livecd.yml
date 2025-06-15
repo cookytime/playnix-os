@@ -183,7 +183,7 @@ jobs:
           docker exec arch-builder bash -c '
           cd /build/archiso-kde
 
-          # Configurar GRUB para arranque automático
+          # Configurar systemd-boot para arranque automático
           mkdir -p efiboot/loader/entries
           cat > efiboot/loader/entries/archiso-x86_64-linux.conf << "EOF"
           title   Arch Linux KDE Live
@@ -192,9 +192,31 @@ jobs:
           options archisobasedir=arch archisolabel=ARCH_KDE quiet splash
           EOF
 
-          # Configurar syslinux
+          # Configurar loader principal con timeout corto
+          cat > efiboot/loader/loader.conf << "EOF"
+          default archiso-x86_64-linux.conf
+          timeout 3
+          console-mode keep
+          EOF
+
+          # Configurar syslinux para BIOS con timeout corto y opción por defecto
           sed -i "s/TIMEOUT 300/TIMEOUT 30/g" syslinux/archiso_sys-linux.cfg
           sed -i "s/archisobasedir=arch/archisobasedir=arch quiet splash/g" syslinux/archiso_sys-linux.cfg
+
+          # Hacer que la primera opción sea la predeterminada en syslinux
+          sed -i "s/UI vesamenu.c32/UI vesamenu.c32\nDEFAULT arch64_ram/" syslinux/archiso_head.cfg
+
+          # Personalizar el menú de arranque
+          cat > syslinux/archiso_sys-linux.cfg << "EOF"
+          LABEL arch64_ram
+          TEXT HELP
+          Boot the Arch Linux KDE Live environment.
+          ENDTEXT
+          MENU LABEL Boot Arch Linux KDE Live (default)
+          LINUX /%INSTALL_DIR%/boot/x86_64/vmlinuz-linux
+          INITRD /%INSTALL_DIR%/boot/x86_64/initramfs-linux.img
+          APPEND archisobasedir=%INSTALL_DIR% archisolabel=%ARCHISO_LABEL% quiet splash
+          EOF
           '
 
       - name: Build ISO
