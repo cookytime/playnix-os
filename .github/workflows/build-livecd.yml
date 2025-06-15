@@ -33,7 +33,6 @@ jobs:
 
       - name: Create archiso profile
         run: |
-          # Ejecutar dentro del contenedor de Arch
           docker exec arch-builder bash -c '
           # Crear directorio de trabajo en el contenedor
           mkdir -p /build/archiso-kde
@@ -43,56 +42,41 @@ jobs:
           cp -r /usr/share/archiso/configs/releng/* .
 
           # Crear lista de paquetes personalizada
-          cat > packages.x86_64 << "EOF"
-          # Base system
+          cat > packages.x86_64 << "PKGEOF"
           base
           linux
           linux-firmware
           mkinitcpio
           mkinitcpio-archiso
-
-          # Boot and filesystem essentials
           syslinux
           efibootmgr
           dosfstools
           mtools
           squashfs-tools
           arch-install-scripts
-
-          # Network
           networkmanager
           dhcpcd
           wpa_supplicant
-
-          # KDE Plasma minimal
           plasma-desktop
           sddm
           konsole
           dolphin
           kate
-
-          # Audio
           pipewire
           pipewire-alsa
           pipewire-pulse
-
-          # Graphics drivers
           mesa
           xf86-video-intel
           xf86-video-amdgpu
           xf86-video-nouveau
-
-          # Basic utilities
           firefox
           htop
           git
           vim
           nano
-
-          # Fonts
           ttf-dejavu
           noto-fonts
-          EOF
+          PKGEOF
           '
 
       - name: Configure automatic login
@@ -102,20 +86,20 @@ jobs:
 
           # Crear configuración de SDDM para autologin
           mkdir -p airootfs/etc/sddm.conf.d
-          cat > airootfs/etc/sddm.conf.d/autologin.conf << "EOF"
+          cat > airootfs/etc/sddm.conf.d/autologin.conf << "SDDMEOF"
           [Autologin]
           User=liveuser
           Session=plasma
-          EOF
+          SDDMEOF
 
           # Crear usuario liveuser
           mkdir -p airootfs/etc
-          cat > airootfs/etc/passwd << "EOF"
+          cat > airootfs/etc/passwd << "PASSWDEOF"
           root:x:0:0:root:/root:/bin/bash
           liveuser:x:1000:1000:Live User:/home/liveuser:/bin/bash
-          EOF
+          PASSWDEOF
 
-          cat > airootfs/etc/group << "EOF"
+          cat > airootfs/etc/group << "GROUPEOF"
           root:x:0:
           wheel:x:1:liveuser
           audio:x:92:liveuser
@@ -125,14 +109,14 @@ jobs:
           scanner:x:96:liveuser
           power:x:98:liveuser
           liveuser:x:1000:
-          EOF
+          GROUPEOF
 
           # Crear directorio home para liveuser
           mkdir -p airootfs/home/liveuser
 
           # Script de customización
           mkdir -p airootfs/root
-          cat > airootfs/root/customize_airootfs.sh << "EOF"
+          cat > airootfs/root/customize_airootfs.sh << "CUSTOMEOF"
           #!/bin/bash
 
           # Habilitar servicios
@@ -158,11 +142,11 @@ jobs:
           echo "LANG=es_ES.UTF-8" > /etc/locale.conf
 
           # Configurar mkinitcpio para archiso
-          sed -i 's/^HOOKS=.*/HOOKS=(base udev archiso archiso_loop_mnt archiso_pxe_common archiso_pxe_nbd archiso_pxe_http archiso_pxe_nfs archiso_kms modconf block filesystems keyboard)/' /etc/mkinitcpio.conf
+          sed -i "s/^HOOKS=.*/HOOKS=(base udev archiso archiso_loop_mnt archiso_pxe_common archiso_pxe_nbd archiso_pxe_http archiso_pxe_nfs archiso_kms modconf block filesystems keyboard)/" /etc/mkinitcpio.conf
 
           # Generar initramfs
           mkinitcpio -P
-          EOF
+          CUSTOMEOF
 
           chmod +x airootfs/root/customize_airootfs.sh
           '
@@ -174,29 +158,29 @@ jobs:
 
           # Configurar systemd-boot para arranque automático
           mkdir -p efiboot/loader/entries
-          cat > efiboot/loader/entries/archiso-x86_64-linux.conf << "EOF"
+          cat > efiboot/loader/entries/archiso-x86_64-linux.conf << "EFIEOF"
           title   Arch Linux KDE Live
           linux   /arch/boot/x86_64/vmlinuz-linux
           initrd  /arch/boot/x86_64/initramfs-linux.img
-          options archisobasedir=arch archisolabel=ARCH_KDE quiet splash
-          EOF
+          options archisobasedir=arch archisolabel=ARCH_KDE cow_spacesize=2G copytoram=n
+          EFIEOF
 
           # Configurar loader principal con timeout corto
-          cat > efiboot/loader/loader.conf << "EOF"
+          cat > efiboot/loader/loader.conf << "LOADEREOF"
           default archiso-x86_64-linux.conf
           timeout 3
           console-mode keep
-          EOF
+          LOADEREOF
 
           # Configurar syslinux para BIOS con timeout corto y opción por defecto
           sed -i "s/TIMEOUT 300/TIMEOUT 30/g" syslinux/archiso_sys-linux.cfg
-          sed -i "s/archisobasedir=arch/archisobasedir=arch quiet splash/g" syslinux/archiso_sys-linux.cfg
+          sed -i "s/archisobasedir=arch/archisobasedir=arch cow_spacesize=2G copytoram=n/g" syslinux/archiso_sys-linux.cfg
 
           # Hacer que la primera opción sea la predeterminada en syslinux
           sed -i "s/UI vesamenu.c32/UI vesamenu.c32\nDEFAULT arch64_ram/" syslinux/archiso_head.cfg
 
-          # Personalizar el menú de arranque - reemplazar completamente el archivo
-          cat > syslinux/archiso_sys-linux.cfg << "EOF"
+          # Personalizar el menú de arranque
+          cat > syslinux/archiso_sys-linux.cfg << "SYSLINUXEOF"
           LABEL arch64_ram
           TEXT HELP
           Boot the Arch Linux KDE Live environment.
@@ -205,12 +189,11 @@ jobs:
           LINUX /%INSTALL_DIR%/boot/x86_64/vmlinuz-linux
           INITRD /%INSTALL_DIR%/boot/x86_64/initramfs-linux.img
           APPEND archisobasedir=%INSTALL_DIR% archisolabel=%ARCHISO_LABEL% cow_spacesize=2G copytoram=n
-          EOF
+          SYSLINUXEOF
 
-          # Configurar profiledef.sh para corregir parámetros
-          cat > profiledef.sh << "EOF"
+          # Configurar profiledef.sh
+          cat > profiledef.sh << "PROFILEEOF"
           #!/usr/bin/env bash
-          # shellcheck disable=SC2034
 
           iso_name="archlinux-kde"
           iso_label="ARCH_KDE"
@@ -224,16 +207,7 @@ jobs:
           pacman_conf="pacman.conf"
           airootfs_image_type="squashfs"
           airootfs_image_tool_options=("-comp" "xz" "-Xbcj" "x86" "-b" "1M" "-Xdict-size" "1M")
-          file_permissions=(
-            ["/etc/shadow"]="0:0:400"
-            ["/etc/gshadow"]="0:0:400"
-            ["/root"]="0:0:750"
-            ["/root/.automated_script.sh"]="0:0:755"
-            ["/usr/local/bin/choose-mirror"]="0:0:755"
-            ["/usr/local/bin/Installation_guide"]="0:0:755"
-            ["/usr/local/bin/livecd-sound"]="0:0:755"
-          )
-          EOF
+          PROFILEEOF
           '
 
       - name: Build ISO
