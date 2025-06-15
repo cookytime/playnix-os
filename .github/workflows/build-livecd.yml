@@ -34,7 +34,7 @@ jobs:
       - name: Create archiso profile
         run: |
           docker exec arch-builder bash -c '
-          # Crear directorio de trabajo en el contenedor
+          # Crear directorio de trabajo
           mkdir -p /build/archiso-kde
           cd /build/archiso-kde
 
@@ -43,109 +43,224 @@ jobs:
 
           # Crear lista de paquetes personalizada
           cat > packages.x86_64 << "PKGEOF"
+          # Base system
           base
+          base-devel
           linux
           linux-firmware
           mkinitcpio
           mkinitcpio-archiso
+          mkinitcpio-nfs-utils
+
+          # Boot
           syslinux
           efibootmgr
+          grub
+          os-prober
+
+          # Filesystem tools
           dosfstools
-          mtools
-          squashfs-tools
-          arch-install-scripts
+          e2fsprogs
+          ntfs-3g
+          exfatprogs
+          btrfs-progs
+          xfsprogs
+          f2fs-tools
+          jfsutils
+          reiserfsprogs
+
+          # Network
           networkmanager
+          network-manager-applet
           dhcpcd
           wpa_supplicant
-          plasma-desktop
-          sddm
-          konsole
-          dolphin
-          kate
-          pipewire
-          pipewire-alsa
-          pipewire-pulse
+          wireless_tools
+          iwd
+          inetutils
+          dnsutils
+          nftables
+          iptables-nft
+
+          # Hardware support
           mesa
           xf86-video-intel
           xf86-video-amdgpu
           xf86-video-nouveau
+          xf86-video-ati
+          xf86-video-vmware
+          xf86-video-vesa
+          xf86-input-libinput
+
+          # Audio
+          pipewire
+          pipewire-alsa
+          pipewire-pulse
+          pipewire-jack
+          wireplumber
+
+          # KDE Plasma
+          plasma-meta
+          kde-applications-meta
+          sddm
+          sddm-kcm
+
+          # Additional KDE apps
+          konsole
+          dolphin
+          kate
+          ark
+          spectacle
+          okular
+          gwenview
+
+          # System tools
           firefox
           htop
+          neofetch
           git
           vim
           nano
+          wget
+          curl
+          rsync
+
+          # Fonts
           ttf-dejavu
+          ttf-liberation
           noto-fonts
+          noto-fonts-emoji
+
+          # Archive tools
+          zip
+          unzip
+          p7zip
+          unrar
+
+          # Live system tools
+          arch-install-scripts
+          gparted
+          testdisk
+          ddrescue
+          clonezilla
+
+          # Additional utilities
+          sudo
+          which
           PKGEOF
           '
 
-      - name: Configure automatic login
+      - name: Create pacman.conf
         run: |
           docker exec arch-builder bash -c '
           cd /build/archiso-kde
 
-          # Crear configuración de SDDM para autologin
+          # Crear pacman.conf personalizado
+          cat > pacman.conf << "PACMANEOF"
+          [options]
+          HoldPkg     = pacman glibc
+          Architecture = x86_64
+          Color
+          CheckSpace
+          ParallelDownloads = 5
+          SigLevel    = Required DatabaseOptional
+          LocalFileSigLevel = Optional
+
+          [core]
+          Include = /etc/pacman.d/mirrorlist
+
+          [extra]
+          Include = /etc/pacman.d/mirrorlist
+
+          [multilib]
+          Include = /etc/pacman.d/mirrorlist
+          PACMANEOF
+          '
+
+      - name: Configure system customization
+        run: |
+          docker exec arch-builder bash -c '
+          cd /build/archiso-kde
+
+          # Crear estructura de directorios necesaria
+          mkdir -p airootfs/etc/skel
+          mkdir -p airootfs/etc/systemd/system
           mkdir -p airootfs/etc/sddm.conf.d
-          cat > airootfs/etc/sddm.conf.d/autologin.conf << "SDDMEOF"
-          [Autologin]
-          User=liveuser
-          Session=plasma
-          SDDMEOF
+          mkdir -p airootfs/root
+
+          # Script de customización principal
+          cat > airootfs/root/customize_airootfs.sh << "CUSTOMEOF"
+          #!/usr/bin/env bash
+
+          set -e -u
+
+          # Configurar locale
+          echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen
+          echo "es_ES.UTF-8 UTF-8" >> /etc/locale.gen
+          locale-gen
+          echo "LANG=en_US.UTF-8" > /etc/locale.conf
+
+          # Configurar teclado
+          echo "KEYMAP=es" > /etc/vconsole.conf
+
+          # Configurar timezone
+          ln -sf /usr/share/zoneinfo/UTC /etc/localtime
 
           # Crear usuario liveuser
-          mkdir -p airootfs/etc
-          cat > airootfs/etc/passwd << "PASSWDEOF"
-          root:x:0:0:root:/root:/bin/bash
-          liveuser:x:1000:1000:Live User:/home/liveuser:/bin/bash
-          PASSWDEOF
+          useradd -m -G wheel,audio,video,storage,optical,network,power -s /bin/bash liveuser
 
-          cat > airootfs/etc/group << "GROUPEOF"
-          root:x:0:
-          wheel:x:1:liveuser
-          audio:x:92:liveuser
-          video:x:93:liveuser
-          optical:x:94:liveuser
-          storage:x:95:liveuser
-          scanner:x:96:liveuser
-          power:x:98:liveuser
-          liveuser:x:1000:
-          GROUPEOF
-
-          # Crear directorio home para liveuser
-          mkdir -p airootfs/home/liveuser
-
-          # Script de customización
-          mkdir -p airootfs/root
-          cat > airootfs/root/customize_airootfs.sh << "CUSTOMEOF"
-          #!/bin/bash
-
-          # Habilitar servicios
-          systemctl enable NetworkManager
-          systemctl enable sddm
-
-          # Configurar permisos para liveuser
-          chown -R 1000:1000 /home/liveuser
-
-          # Añadir liveuser a grupos necesarios
-          usermod -aG wheel,audio,video,optical,storage,scanner,power liveuser
+          # Sin contraseña para liveuser
+          passwd -d liveuser
 
           # Configurar sudo sin contraseña para wheel
           echo "%wheel ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 
-          # Configurar teclado español
-          echo "KEYMAP=es" > /etc/vconsole.conf
+          # Habilitar servicios necesarios
+          systemctl enable NetworkManager.service
+          systemctl enable sddm.service
 
-          # Configurar locale
-          echo "es_ES.UTF-8 UTF-8" >> /etc/locale.gen
-          echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen
-          locale-gen
-          echo "LANG=es_ES.UTF-8" > /etc/locale.conf
+          # Crear servicio para configuración inicial
+          cat > /etc/systemd/system/livecd-setup.service << EOF
+          [Unit]
+          Description=LiveCD Setup Service
+          After=multi-user.target
 
-          # Configurar mkinitcpio para archiso
-          sed -i "s/^HOOKS=.*/HOOKS=(base udev archiso archiso_loop_mnt archiso_pxe_common archiso_pxe_nbd archiso_pxe_http archiso_pxe_nfs archiso_kms modconf block filesystems keyboard)/" /etc/mkinitcpio.conf
+          [Service]
+          Type=oneshot
+          ExecStart=/usr/local/bin/livecd-setup.sh
+          RemainAfterExit=yes
 
-          # Generar initramfs
-          mkinitcpio -P
+          [Install]
+          WantedBy=multi-user.target
+          EOF
+
+          # Script de configuración inicial
+          cat > /usr/local/bin/livecd-setup.sh << EOF
+          #!/bin/bash
+          # Configurar el home del usuario si es necesario
+          if [ ! -f /home/liveuser/.config/plasma-org.kde.plasma.desktop-appletsrc ]; then
+              su - liveuser -c "mkdir -p ~/.config"
+          fi
+          EOF
+
+          chmod +x /usr/local/bin/livecd-setup.sh
+          systemctl enable livecd-setup.service
+
+          # Configurar autologin en SDDM
+          mkdir -p /etc/sddm.conf.d
+          cat > /etc/sddm.conf.d/autologin.conf << EOF
+          [Autologin]
+          User=liveuser
+          Session=plasma
+
+          [Theme]
+          Current=breeze
+          EOF
+
+          # Configurar hostname
+          echo "archiso" > /etc/hostname
+
+          # Limpiar cachés
+          pacman -Scc --noconfirm
           CUSTOMEOF
 
           chmod +x airootfs/root/customize_airootfs.sh
@@ -156,47 +271,78 @@ jobs:
           docker exec arch-builder bash -c '
           cd /build/archiso-kde
 
-          # Configurar systemd-boot para arranque automático
-          mkdir -p efiboot/loader/entries
-          cat > efiboot/loader/entries/archiso-x86_64-linux.conf << "EFIEOF"
-          title   Arch Linux KDE Live
-          linux   /arch/boot/x86_64/vmlinuz-linux
-          initrd  /arch/boot/x86_64/initramfs-linux.img
-          options archisobasedir=arch archisolabel=ARCH_KDE cow_spacesize=2G copytoram=n
-          EFIEOF
+          # Configurar grub
+          mkdir -p grub
+          cat > grub/grub.cfg << "GRUBEOF"
+          insmod part_gpt
+          insmod part_msdos
+          insmod fat
+          insmod iso9660
 
-          # Configurar loader principal con timeout corto
-          cat > efiboot/loader/loader.conf << "LOADEREOF"
-          default archiso-x86_64-linux.conf
-          timeout 3
-          console-mode keep
-          LOADEREOF
+          insmod all_video
+          insmod font
 
-          # Configurar syslinux para BIOS con timeout corto y opción por defecto
-          sed -i "s/TIMEOUT 300/TIMEOUT 30/g" syslinux/archiso_sys-linux.cfg
-          sed -i "s/archisobasedir=arch/archisobasedir=arch cow_spacesize=2G copytoram=n/g" syslinux/archiso_sys-linux.cfg
+          set default="0"
+          set timeout=5
 
-          # Hacer que la primera opción sea la predeterminada en syslinux
-          sed -i "s/UI vesamenu.c32/UI vesamenu.c32\nDEFAULT arch64_ram/" syslinux/archiso_head.cfg
+          menuentry "Arch Linux KDE Live" {
+              set gfxpayload=keep
+              linux /%INSTALL_DIR%/boot/x86_64/vmlinuz-linux archisobasedir=%INSTALL_DIR% archisolabel=%ARCHISO_LABEL% quiet splash
+              initrd /%INSTALL_DIR%/boot/x86_64/initramfs-linux.img
+          }
 
-          # Personalizar el menú de arranque
-          cat > syslinux/archiso_sys-linux.cfg << "SYSLINUXEOF"
-          LABEL arch64_ram
+          menuentry "Arch Linux KDE Live (nomodeset)" {
+              set gfxpayload=keep
+              linux /%INSTALL_DIR%/boot/x86_64/vmlinuz-linux archisobasedir=%INSTALL_DIR% archisolabel=%ARCHISO_LABEL% nomodeset
+              initrd /%INSTALL_DIR%/boot/x86_64/initramfs-linux.img
+          }
+          GRUBEOF
+
+          # Configurar syslinux
+          cat > syslinux/archiso_sys-linux.cfg << "SYSEOF"
+          LABEL arch64
           TEXT HELP
           Boot the Arch Linux KDE Live environment.
           ENDTEXT
-          MENU LABEL Boot Arch Linux KDE Live (default)
+          MENU LABEL Arch Linux KDE Live
           LINUX /%INSTALL_DIR%/boot/x86_64/vmlinuz-linux
           INITRD /%INSTALL_DIR%/boot/x86_64/initramfs-linux.img
-          APPEND archisobasedir=%INSTALL_DIR% archisolabel=%ARCHISO_LABEL% cow_spacesize=2G copytoram=n
-          SYSLINUXEOF
+          APPEND archisobasedir=%INSTALL_DIR% archisolabel=%ARCHISO_LABEL% quiet splash
+
+          LABEL arch64_nomodeset
+          TEXT HELP
+          Boot the Arch Linux KDE Live environment with nomodeset.
+          ENDTEXT
+          MENU LABEL Arch Linux KDE Live (nomodeset)
+          LINUX /%INSTALL_DIR%/boot/x86_64/vmlinuz-linux
+          INITRD /%INSTALL_DIR%/boot/x86_64/initramfs-linux.img
+          APPEND archisobasedir=%INSTALL_DIR% archisolabel=%ARCHISO_LABEL% nomodeset
+          SYSEOF
+
+          # Configurar timeout corto
+          sed -i "s/TIMEOUT 300/TIMEOUT 30/" syslinux/archiso_head.cfg
+
+          # Configurar systemd-boot
+          mkdir -p efiboot/loader/entries
+          cat > efiboot/loader/loader.conf << "LOADEREOF"
+          default  archiso-x86_64-linux.conf
+          timeout  3
+          console-mode keep
+          LOADEREOF
+
+          cat > efiboot/loader/entries/archiso-x86_64-linux.conf << "ENTRYEOF"
+          title   Arch Linux KDE Live
+          linux   /%INSTALL_DIR%/boot/x86_64/vmlinuz-linux
+          initrd  /%INSTALL_DIR%/boot/x86_64/initramfs-linux.img
+          options archisobasedir=%INSTALL_DIR% archisolabel=%ARCHISO_LABEL% quiet splash
+          ENTRYEOF
 
           # Configurar profiledef.sh
           cat > profiledef.sh << "PROFILEEOF"
           #!/usr/bin/env bash
 
           iso_name="archlinux-kde"
-          iso_label="ARCH_KDE"
+          iso_label="ARCH_KDE_$(date +%Y%m)"
           iso_publisher="Arch Linux KDE Live"
           iso_application="Arch Linux KDE Live CD"
           iso_version="$(date +%Y.%m.%d)"
@@ -207,6 +353,11 @@ jobs:
           pacman_conf="pacman.conf"
           airootfs_image_type="squashfs"
           airootfs_image_tool_options=("-comp" "xz" "-Xbcj" "x86" "-b" "1M" "-Xdict-size" "1M")
+          file_permissions=(
+            ["/root"]="0:0:750"
+            ["/root/customize_airootfs.sh"]="0:0:755"
+            ["/usr/local/bin/livecd-setup.sh"]="0:0:755"
+          )
           PROFILEEOF
           '
 
@@ -214,6 +365,14 @@ jobs:
         run: |
           docker exec arch-builder bash -c '
           cd /build/archiso-kde
+
+          # Verificar que todos los archivos necesarios existen
+          echo "=== Verificando archivos ==="
+          ls -la
+          echo "=== Contenido de packages.x86_64 ==="
+          head -20 packages.x86_64
+          echo "=== Contenido de profiledef.sh ==="
+          cat profiledef.sh
 
           # Crear el ISO
           mkarchiso -v -w work -o out .
@@ -229,9 +388,10 @@ jobs:
           docker cp arch-builder:/build/archiso-kde/out/. ./iso-output/
 
       - name: Cleanup container
+        if: always()
         run: |
-          docker stop arch-builder
-          docker rm arch-builder
+          docker stop arch-builder || true
+          docker rm arch-builder || true
 
       - name: Upload ISO artifact
         uses: actions/upload-artifact@v4
@@ -241,24 +401,41 @@ jobs:
           retention-days: 30
 
       - name: Create Release
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ github.run_number }}
           name: Arch Linux KDE Live CD v${{ github.run_number }}
           body: |
-            Arch Linux Live CD con KDE Plasma y login automático
+            # Arch Linux Live CD con KDE Plasma
 
-            Características:
-            - KDE Plasma Desktop completo
-            - Login automático como usuario 'liveuser'
-            - NetworkManager habilitado
-            - Aplicaciones básicas incluidas (Firefox, Konsole, Dolphin, etc.)
-            - Drivers gráficos incluidos
-            - Configuración de audio con PipeWire
+            ## Características:
+            - **Entorno de escritorio**: KDE Plasma completo
+            - **Usuario**: `liveuser` (sin contraseña, login automático)
+            - **Privilegios**: sudo disponible sin contraseña
+            - **Red**: NetworkManager habilitado
+            - **Aplicaciones incluidas**:
+              - Firefox (navegador web)
+              - Konsole (terminal)
+              - Dolphin (gestor de archivos)
+              - Kate (editor de texto)
+              - GParted (gestor de particiones)
+              - Y muchas más aplicaciones de KDE
 
-            Usuario: liveuser (sin contraseña)
-            Sudo disponible sin contraseña
+            ## Requisitos del sistema:
+            - **RAM mínima**: 2GB (4GB recomendado)
+            - **Espacio en disco**: La ISO ocupa aproximadamente 2-3GB
+            - **Arquitectura**: x86_64
+
+            ## Instrucciones de uso:
+            1. Descarga la ISO
+            2. Graba la ISO en un USB usando dd, Rufus o Etcher
+            3. Arranca desde el USB
+            4. El sistema iniciará automáticamente con KDE Plasma
+
+            ## Notas:
+            - Esta es una versión live, los cambios no se guardan al reiniciar
+            - Para instalar Arch Linux permanentemente, usa `archinstall` desde la terminal
 
           files: iso-output/*.iso
           draft: false
