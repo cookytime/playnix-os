@@ -187,7 +187,7 @@ jobs:
           cat > airootfs/usr/local/bin/arch-installer << "INSTALLEREOF"
           #!/bin/bash
 
-          # Arch Linux Installer Script
+          # Arch Linux Automatic Installer - 100% Automatico
           set -e
 
           # Colores
@@ -229,118 +229,302 @@ jobs:
               print_msg "Conexión a internet OK"
           }
 
-          show_disks() {
-              print_title "Discos disponibles"
-              lsblk -f
-              echo ""
-              fdisk -l | grep "Disk /"
-          }
+          detect_nvme() {
+              print_msg "Detectando disco NVMe..."
 
-          partition_disk() {
-              show_disks
-              echo ""
-              read -p "Introduce el disco (ej: /dev/sda): " DISK
+              # Buscar discos NVMe
+              NVME_DISK=""
+              for disk in /dev/nvme*n1; do
+                  if [ -b "$disk" ]; then
+                      NVME_DISK="$disk"
+                      break
+                  fi
+              done
 
-              if [ ! -b "$DISK" ]; then
-                  print_error "El disco $DISK no existe"
+              if [ -z "$NVME_DISK" ]; then
+                  print_error "No se encontró disco NVMe. Buscando alternativas..."
+                  # Buscar otros discos como respaldo
+                  for disk in /dev/sda /dev/sdb /dev/vda; do
+                      if [ -b "$disk" ]; then
+                          NVME_DISK="$disk"
+                          print_warning "Usando $disk como disco de instalación"
+                          break
+                      fi
+                  done
+              fi
+
+              if [ -z "$NVME_DISK" ]; then
+                  print_error "No se encontró ningún disco para instalar"
                   exit 1
               fi
 
-              print_warning "Esto borrará todos los datos en $DISK"
-              read -p "Continuar? (yes/no): " confirm
-              if [ "$confirm" != "yes" ]; then
-                  exit 0
-              fi
-
-              print_msg "Particionando con cfdisk..."
-              cfdisk "$DISK"
+              print_msg "Disco seleccionado: $NVME_DISK"
+              echo "$NVME_DISK"
           }
 
-          format_partitions() {
-              show_disks
+          partition_disk_auto() {
+              local DISK="$1"
+              print_title "Particionando disco automáticamente: $DISK"
+
+              # Limpiar disco completamente
+              print_msg "Limpiando disco..."
+              wipefs -af "$DISK"
+              sgdisk --zap-all "$DISK"
+
+              # Crear tabla de particiones GPT
+              print_msg "Creando tabla de particiones GPT..."
 
               if [ -d /sys/firmware/efi/efivars ]; then
-                  print_msg "Sistema UEFI detectado"
-                  read -p "Partición EFI: " EFI_PART
-                  read -p "Partición root: " ROOT_PART
-                  mkfs.fat -F32 "$EFI_PART"
+                  print_msg "Sistema UEFI - Creando particiones EFI + Root"
+                  # UEFI: EFI (512MB) + Root (resto)
+                  sgdisk -n 1:0:+512M -t 1:ef00 -c 1:"EFI" "$DISK"
+                  sgdisk -n 2:0:0 -t 2:8300 -c 2:"Root" "$DISK"
+
+                  # Variables para particiones
+                  EFI_PART="${DISK}p1"
+                  ROOT_PART="${DISK}p2"
+
+                  # Si es un disco SATA, usar formato /dev/sdaX
+                  if [[ "$DISK" == /dev/sd* ]]; then
+                      EFI_PART="${DISK}1"
+                      ROOT_PART="${DISK}2"
+                  fi
               else
-                  print_msg "Sistema BIOS detectado"
-                  read -p "Partición root: " ROOT_PART
+                  print_msg "Sistema BIOS - Creando partición Root única"
+                  # BIOS: Solo Root
+                  sgdisk -n 1:0:0 -t 1:8300 -c 1:"Root" "$DISK"
+                  ROOT_PART="${DISK}p1"
+
+                  if [[ "$DISK" == /dev/sd* ]]; then
+                      ROOT_PART="${DISK}1"
+                  fi
               fi
 
-              read -p "Partición swap (opcional): " SWAP_PART
+              # Esperar a que el kernel reconozca las particiones
+              print_msg "Esperando reconocimiento de particiones..."
+              sleep 3
+              partprobe "$DISK"
+              sleep 2
+          }
 
-              mkfs.ext4 "$ROOT_PART"
-
-              if [ -n "$SWAP_PART" ]; then
-                  mkswap "$SWAP_PART"
-                  swapon "$SWAP_PART"
-              fi
-
-              mount "$ROOT_PART" /mnt
+          format_partitions_auto() {
+              print_title "Formateando particiones automáticamente"
 
               if [ -d /sys/firmware/efi/efivars ]; then
+                  print_msg "Formateando partición EFI: $EFI_PART"
+                  mkfs.fat -F32 "$EFI_PART"
+
+                  print_msg "Formateando partición Root: $ROOT_PART"
+                  mkfs.ext4 -F "$ROOT_PART"
+
+                  print_msg "Montando particiones..."
+                  mount "$ROOT_PART" /mnt
                   mkdir -p /mnt/boot/efi
                   mount "$EFI_PART" /mnt/boot/efi
+              else
+                  print_msg "Formateando partición Root: $ROOT_PART"
+                  mkfs.ext4 -F "$ROOT_PART"
+
+                  print_msg "Montando partición..."
+                  mount "$ROOT_PART" /mnt
               fi
           }
 
-          install_base() {
-              print_msg "Instalando sistema base..."
-              pacstrap /mnt base linux linux-firmware base-devel grub
+          install_base_auto() {
+              print_title "Instalando sistema base automáticamente"
+
+              print_msg "Actualizando mirrors..."
+              reflector --country Spain,France,Germany --age 12 --protocol https --sort rate --save /etc/pacman.d/mirrorlist
+
+              print_msg "Instalando paquetes base..."
+              pacstrap /mnt base linux linux-firmware base-devel grub networkmanager
+
+              print_msg "Generando fstab..."
               genfstab -U /mnt >> /mnt/etc/fstab
           }
 
-          configure_system() {
-              print_msg "Configurando sistema..."
+          install_kde_auto() {
+              print_title "Instalando KDE Plasma automáticamente"
 
-              cat > /mnt/root/config.sh << "CONFEOF"
-          ln -sf /usr/share/zoneinfo/Europe/Madrid /etc/localtime
-          hwclock --systohc
-          sed -i "s/#es_ES.UTF-8/es_ES.UTF-8/" /etc/locale.gen
-          locale-gen
-          echo "LANG=es_ES.UTF-8" > /etc/locale.conf
-          echo "KEYMAP=es" > /etc/vconsole.conf
-          read -p "Hostname: " hostname
-          echo "$hostname" > /etc/hostname
-          echo "Contraseña de root:"
-          passwd
-          read -p "Usuario: " user
-          useradd -m -G wheel "$user"
-          passwd "$user"
-          sed -i "s/# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/" /etc/sudoers
-          pacman -S --noconfirm networkmanager
-          systemctl enable NetworkManager
-          if [ -d /sys/firmware/efi/efivars ]; then
-              pacman -S --noconfirm efibootmgr
-              grub-install --target=x86_64-efi --efi-directory=/boot/efi
-          else
-              grub-install /dev/sda
-          fi
-          grub-mkconfig -o /boot/grub/grub.cfg
-          CONFEOF
+              print_msg "Instalando KDE y aplicaciones..."
+              arch-chroot /mnt pacman -S --noconfirm \
+                  plasma-desktop \
+                  sddm \
+                  konsole \
+                  dolphin \
+                  kate \
+                  firefox \
+                  spectacle \
+                  okular \
+                  gwenview \
+                  ark \
+                  breeze \
+                  breeze-gtk \
+                  kde-gtk-config \
+                  plasma-nm \
+                  plasma-pa \
+                  powerdevil
 
-              arch-chroot /mnt bash /root/config.sh
-              rm /mnt/root/config.sh
+              print_msg "Habilitando SDDM..."
+              arch-chroot /mnt systemctl enable sddm.service
           }
 
-          main() {
-              print_title "Instalador de Arch Linux"
+          configure_system_auto() {
+              print_title "Configurando sistema automáticamente"
+
+              print_msg "Configurando zona horaria..."
+              arch-chroot /mnt ln -sf /usr/share/zoneinfo/Europe/Madrid /etc/localtime
+              arch-chroot /mnt hwclock --systohc
+
+              print_msg "Configurando idioma..."
+              arch-chroot /mnt sed -i "s/#es_ES.UTF-8/es_ES.UTF-8/" /etc/locale.gen
+              arch-chroot /mnt sed -i "s/#en_US.UTF-8/en_US.UTF-8/" /etc/locale.gen
+              arch-chroot /mnt locale-gen
+              echo "LANG=es_ES.UTF-8" > /mnt/etc/locale.conf
+              echo "KEYMAP=es" > /mnt/etc/vconsole.conf
+
+              print_msg "Configurando hostname..."
+              echo "playnix-arch" > /mnt/etc/hostname
+              cat > /mnt/etc/hosts << EOF
+          127.0.0.1   localhost
+          ::1         localhost
+          127.0.1.1   playnix-arch.localdomain playnix-arch
+          EOF
+
+              print_msg "Configurando contraseña de root..."
+              arch-chroot /mnt bash -c "echo 'root:playnix' | chpasswd"
+
+              print_msg "Creando usuario playnix..."
+              arch-chroot /mnt useradd -m -G wheel,audio,video,storage,optical,network,power -s /bin/bash playnix
+              arch-chroot /mnt bash -c "echo 'playnix:playnix' | chpasswd"
+
+              print_msg "Configurando sudo..."
+              arch-chroot /mnt sed -i "s/# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/" /etc/sudoers
+
+              print_msg "Habilitando NetworkManager..."
+              arch-chroot /mnt systemctl enable NetworkManager.service
+          }
+
+          install_bootloader_auto() {
+              print_title "Instalando bootloader automáticamente"
+
+              if [ -d /sys/firmware/efi/efivars ]; then
+                  print_msg "Instalando GRUB para UEFI..."
+                  arch-chroot /mnt pacman -S --noconfirm efibootmgr
+                  arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=ARCH
+              else
+                  print_msg "Instalando GRUB para BIOS..."
+                  arch-chroot /mnt grub-install --target=i386-pc "$NVME_DISK"
+              fi
+
+              print_msg "Generando configuración de GRUB..."
+              arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg
+          }
+
+          configure_sddm_auto() {
+              print_title "Configurando SDDM para autologin"
+
+              print_msg "Configurando autologin para usuario playnix..."
+              mkdir -p /mnt/etc/sddm.conf.d
+              cat > /mnt/etc/sddm.conf.d/autologin.conf << EOF
+          [Autologin]
+          User=playnix
+          Session=plasma
+
+          [Theme]
+          Current=breeze
+
+          [General]
+          HaltCommand=/usr/bin/systemctl poweroff
+          RebootCommand=/usr/bin/systemctl reboot
+          EOF
+          }
+
+          cleanup_installation() {
+              print_msg "Limpiando instalación..."
+              arch-chroot /mnt pacman -Scc --noconfirm
+          }
+
+          main_auto() {
+              print_title "INSTALADOR AUTOMÁTICO DE ARCH LINUX + KDE"
+              print_msg "Instalación completamente automática iniciada..."
+              print_warning "Usuario: playnix | Contraseña: playnix"
+
               check_root
               check_internet
-              partition_disk
-              format_partitions
-              install_base
-              configure_system
+
+              # Detectar disco NVMe
+              NVME_DISK=$(detect_nvme)
+
+              print_warning "SE INSTALARÁ EN: $NVME_DISK"
+              print_warning "TODOS LOS DATOS EN $NVME_DISK SERÁN ELIMINADOS"
+              echo ""
+              print_msg "La instalación comenzará en 10 segundos..."
+              print_msg "Presiona Ctrl+C para cancelar"
+              sleep 10
+
+              # Proceso automático
+              partition_disk_auto "$NVME_DISK"
+              format_partitions_auto
+              install_base_auto
+              install_kde_auto
+              configure_system_auto
+              install_bootloader_auto
+              configure_sddm_auto
+              cleanup_installation
+
+              # Finalizar
+              print_msg "Desmontando particiones..."
               umount -R /mnt
-              print_title "Instalación completada"
+
+              print_title "¡INSTALACIÓN COMPLETADA!"
+              print_msg "Sistema instalado en: $NVME_DISK"
+              print_msg "Usuario: playnix"
+              print_msg "Contraseña: playnix"
+              print_msg "Entorno: KDE Plasma con autologin"
+              print_warning "Retira el USB e inicia desde el disco duro"
+
+              echo ""
+              read -p "¿Reiniciar ahora? (y/n): " reboot_choice
+              if [ "$reboot_choice" = "y" ] || [ "$reboot_choice" = "Y" ]; then
+                  print_msg "Reiniciando en 3 segundos..."
+                  sleep 3
+                  reboot
+              fi
           }
 
-          case "${1:-install}" in
-              "install") main ;;
-              "manual") firefox "https://wiki.archlinux.org/title/Installation_guide" & ;;
-              *) echo "Uso: arch-installer [install|manual]" ;;
+          show_help() {
+              echo "Instalador Automático de Arch Linux + KDE"
+              echo ""
+              echo "Opciones:"
+              echo "  auto     - Instalación 100% automática (por defecto)"
+              echo "  manual   - Abrir guía manual"
+              echo "  help     - Mostrar ayuda"
+              echo ""
+              echo "CONFIGURACIÓN AUTOMÁTICA:"
+              echo "  • Disco: Primer NVMe encontrado"
+              echo "  • Usuario: playnix"
+              echo "  • Contraseña: playnix"
+              echo "  • Entorno: KDE Plasma"
+              echo "  • Autologin: Habilitado"
+          }
+
+          # Ejecutar según parámetro
+          case "${1:-auto}" in
+              "auto"|"install")
+                  main_auto
+                  ;;
+              "manual")
+                  firefox "https://wiki.archlinux.org/title/Installation_guide" &
+                  ;;
+              "help"|"-h"|"--help")
+                  show_help
+                  ;;
+              *)
+                  print_error "Opción desconocida: $1"
+                  show_help
+                  exit 1
+                  ;;
           esac
           INSTALLEREOF
 
