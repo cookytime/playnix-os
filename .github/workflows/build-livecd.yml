@@ -1,0 +1,245 @@
+name: Build Arch Linux KDE Live CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-livecd:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Free up disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          sudo apt-get remove -y '^dotnet-.*'
+          sudo apt-get remove -y '^llvm-.*'
+          sudo apt-get remove -y 'php.*'
+          sudo apt-get autoremove -y
+          sudo apt-get clean
+          df -h
+
+      - name: Install archiso and dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y arch-install-scripts squashfs-tools libisoburn1
+
+          # Instalar archiso desde AUR manualmente
+          wget https://gitlab.archlinux.org/archlinux/archiso/-/archive/master/archiso-master.tar.gz
+          tar -xzf archiso-master.tar.gz
+          cd archiso-master
+          sudo make install
+          cd ..
+
+      - name: Create archiso profile
+        run: |
+          # Crear directorio de trabajo
+          mkdir -p archiso-kde
+          cd archiso-kde
+
+          # Copiar perfil base
+          cp -r /usr/share/archiso/configs/releng/* .
+
+          # Crear lista de paquetes personalizada
+          cat > packages.x86_64 << 'EOF'
+          # Base system
+          base
+          base-devel
+          linux
+          linux-firmware
+
+          # Boot and filesystem
+          syslinux
+          efibootmgr
+          dosfstools
+
+          # Network
+          networkmanager
+          dhcpcd
+
+          # KDE Plasma
+          plasma-meta
+          kde-applications-meta
+          plasma-wayland-session
+
+          # Display manager
+          sddm
+
+          # Audio
+          pipewire
+          pipewire-alsa
+          pipewire-pulse
+          pipewire-jack
+
+          # Graphics drivers
+          xf86-video-intel
+          xf86-video-amdgpu
+          xf86-video-nouveau
+          mesa
+
+          # Utilities
+          firefox
+          konsole
+          dolphin
+          kate
+          ark
+          spectacle
+          gwenview
+          okular
+
+          # System tools
+          htop
+          neofetch
+          git
+          vim
+          nano
+
+          # Fonts
+          ttf-dejavu
+          ttf-liberation
+          noto-fonts
+          EOF
+
+      - name: Configure automatic login
+        run: |
+          cd archiso-kde
+
+          # Crear configuración de SDDM para autologin
+          mkdir -p airootfs/etc/sddm.conf.d
+          cat > airootfs/etc/sddm.conf.d/autologin.conf << 'EOF'
+          [Autologin]
+          User=liveuser
+          Session=plasma
+          EOF
+
+          # Crear usuario liveuser
+          mkdir -p airootfs/etc
+          cat > airootfs/etc/passwd << 'EOF'
+          root:x:0:0:root:/root:/bin/bash
+          liveuser:x:1000:1000:Live User:/home/liveuser:/bin/bash
+          EOF
+
+          cat > airootfs/etc/group << 'EOF'
+          root:x:0:
+          wheel:x:1:liveuser
+          audio:x:92:liveuser
+          video:x:93:liveuser
+          optical:x:94:liveuser
+          storage:x:95:liveuser
+          scanner:x:96:liveuser
+          power:x:98:liveuser
+          liveuser:x:1000:
+          EOF
+
+          # Crear directorio home para liveuser
+          mkdir -p airootfs/home/liveuser
+
+          # Script de customización
+          mkdir -p airootfs/root
+          cat > airootfs/root/customize_airootfs.sh << 'EOF'
+          #!/bin/bash
+
+          # Habilitar servicios
+          systemctl enable NetworkManager
+          systemctl enable sddm
+
+          # Configurar permisos para liveuser
+          chown -R 1000:1000 /home/liveuser
+
+          # Añadir liveuser a grupos necesarios
+          usermod -aG wheel,audio,video,optical,storage,scanner,power liveuser
+
+          # Configurar sudo sin contraseña para wheel
+          echo "%wheel ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+
+          # Configurar KDE para liveuser
+          mkdir -p /home/liveuser/.config
+          cat > /home/liveuser/.config/startupconfig << 'KDEEOF'
+          kcminputrc Mouse cursorTheme 'breeze_cursors'
+          kcminputrc Mouse cursorSize ''
+          kwinrc Compositing Enabled true
+          kwinrc Compositing AnimationSpeed 3
+          KDEEOF
+
+          chown -R 1000:1000 /home/liveuser/.config
+
+          # Configurar teclado español
+          echo "KEYMAP=es" > /etc/vconsole.conf
+
+          # Configurar locale
+          echo "es_ES.UTF-8 UTF-8" >> /etc/locale.gen
+          echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen
+          locale-gen
+          echo "LANG=es_ES.UTF-8" > /etc/locale.conf
+          EOF
+
+          chmod +x airootfs/root/customize_airootfs.sh
+
+      - name: Configure boot parameters
+        run: |
+          cd archiso-kde
+
+          # Configurar GRUB para arranque automático
+          mkdir -p efiboot/loader/entries
+          cat > efiboot/loader/entries/archiso-x86_64-linux.conf << 'EOF'
+          title   Arch Linux KDE Live
+          linux   /arch/boot/x86_64/vmlinuz-linux
+          initrd  /arch/boot/x86_64/initramfs-linux.img
+          options archisobasedir=arch archisolabel=ARCH_KDE quiet splash
+          EOF
+
+          # Configurar syslinux
+          sed -i 's/TIMEOUT 300/TIMEOUT 30/g' syslinux/archiso_sys-linux.cfg
+          sed -i 's/archisobasedir=arch/archisobasedir=arch quiet splash/g' syslinux/archiso_sys-linux.cfg
+
+      - name: Build ISO
+        run: |
+          cd archiso-kde
+
+          # Crear el ISO
+          sudo mkarchiso -v -w work -o out .
+
+          # Listar archivos generados
+          ls -la out/
+
+      - name: Upload ISO artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: arch-kde-livecd
+          path: archiso-kde/out/*.iso
+          retention-days: 30
+
+      - name: Create Release
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ github.run_number }}
+          name: Arch Linux KDE Live CD v${{ github.run_number }}
+          body: |
+            Arch Linux Live CD con KDE Plasma y login automático
+
+            Características:
+            - KDE Plasma Desktop completo
+            - Login automático como usuario 'liveuser'
+            - NetworkManager habilitado
+            - Aplicaciones básicas incluidas (Firefox, Konsole, Dolphin, etc.)
+            - Drivers gráficos incluidos
+            - Configuración de audio con PipeWire
+
+            Usuario: liveuser (sin contraseña)
+            Sudo disponible sin contraseña
+
+          files: archiso-kde/out/*.iso
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
