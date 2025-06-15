@@ -384,23 +384,23 @@ jobs:
           FINISHEDCONF
 
           # Configurar shellprocess
-          cat > airootfs/etc/calamares/modules/shellprocess-before.conf << "SHELLBEFORE"
-          ---
-          dontChroot: false
-          timeout: 999
-          script:
-              - command: "pacman-key --init"
-              - command: "pacman-key --populate archlinux"
-          SHELLBEFORE
+          cat > airootfs/etc/calamares/modules/shellprocess-before.conf << '\''SHELLBEFORE'\''
+---
+dontChroot: false
+timeout: 999
+script:
+    - command: "pacman-key --init"
+    - command: "pacman-key --populate archlinux"
+SHELLBEFORE
 
-          cat > airootfs/etc/calamares/modules/shellprocess-after.conf << "SHELLAFTER"
-          ---
-          dontChroot: false
-          timeout: 999
-          script:
-              - command: "systemctl enable NetworkManager"
-              - command: "systemctl enable sddm"
-          SHELLAFTER
+          cat > airootfs/etc/calamares/modules/shellprocess-after.conf << '\''SHELLAFTER'\''
+---
+dontChroot: false
+timeout: 999
+script:
+    - command: "systemctl enable NetworkManager"
+    - command: "systemctl enable sddm"
+SHELLAFTER
 
           # Crear otros módulos necesarios
           cat > airootfs/etc/calamares/modules/machineid.conf << "MACHINEIDCONF"
@@ -550,14 +550,14 @@ jobs:
           cp airootfs/usr/share/applications/calamares.desktop airootfs/etc/skel/Desktop/
           chmod +x airootfs/etc/skel/Desktop/calamares.desktop
 
-          # Crear un icono simple para Calamares (usaremos el icono de Arch)
-          cat > airootfs/usr/share/pixmaps/calamares.svg << "CALAMARESICON"
-          <?xml version="1.0" encoding="UTF-8"?>
-          <svg width="64" height="64" version="1.1" xmlns="http://www.w3.org/2000/svg">
-            <rect width="64" height="64" rx="8" fill="#1793d1"/>
-            <text x="32" y="40" text-anchor="middle" font-family="sans-serif" font-size="28" font-weight="bold" fill="white">A</text>
-          </svg>
-          CALAMARESICON
+          # Crear un icono simple para Calamares
+          cat > airootfs/usr/share/pixmaps/calamares.svg << '\''CALAMARESICON'\''
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="64" height="64" version="1.1" xmlns="http://www.w3.org/2000/svg">
+  <rect width="64" height="64" rx="8" fill="#1793d1"/>
+  <text x="32" y="40" text-anchor="middle" font-family="sans-serif" font-size="28" font-weight="bold" fill="white">A</text>
+</svg>
+CALAMARESICON
 
           # Script de customización principal
           cat > airootfs/root/customize_airootfs.sh << "CUSTOMEOF"
