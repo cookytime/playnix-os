@@ -96,11 +96,18 @@ jobs:
           pipewire-jack
           wireplumber
 
-          # KDE Plasma
-          plasma-meta
-          kde-applications-meta
+          # KDE Plasma (minimal)
+          plasma-desktop
+          plasma-nm
+          plasma-pa
+          powerdevil
           sddm
           sddm-kcm
+          breeze
+          breeze-gtk
+          kde-gtk-config
+          kscreen
+          kinfocenter
 
           # Additional KDE apps
           konsole
