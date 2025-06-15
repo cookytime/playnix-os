@@ -52,6 +52,8 @@ jobs:
           syslinux
           efibootmgr
           dosfstools
+          mtools
+          squashfs-tools
 
           # Network
           networkmanager
@@ -206,7 +208,7 @@ jobs:
           # Hacer que la primera opción sea la predeterminada en syslinux
           sed -i "s/UI vesamenu.c32/UI vesamenu.c32\nDEFAULT arch64_ram/" syslinux/archiso_head.cfg
 
-          # Personalizar el menú de arranque
+          # Personalizar el menú de arranque - reemplazar completamente el archivo
           cat > syslinux/archiso_sys-linux.cfg << "EOF"
           LABEL arch64_ram
           TEXT HELP
@@ -215,7 +217,19 @@ jobs:
           MENU LABEL Boot Arch Linux KDE Live (default)
           LINUX /%INSTALL_DIR%/boot/x86_64/vmlinuz-linux
           INITRD /%INSTALL_DIR%/boot/x86_64/initramfs-linux.img
-          APPEND archisobasedir=%INSTALL_DIR% archisolabel=%ARCHISO_LABEL% quiet splash
+          APPEND archisobasedir=%INSTALL_DIR% archisolabel=%ARCHISO_LABEL% cow_spacesize=1G quiet splash
+          EOF
+
+          # Configurar profiledef.sh para corregir parámetros
+          cat >> profiledef.sh << "EOF"
+
+          # Configuración adicional para Live CD
+          iso_label="ARCH_KDE"
+          iso_publisher="Arch Linux KDE Live"
+          iso_application="Arch Linux KDE Live CD"
+          bootmodes=("bios.syslinux.mbr" "bios.syslinux.eltorito" "uefi-x64.systemd-boot.esp" "uefi-x64.systemd-boot.eltorito")
+          airootfs_image_type="squashfs"
+          airootfs_image_tool_options=("-comp" "xz" "-Xbcj" "x86" "-b" "1M")
           EOF
           '
 
