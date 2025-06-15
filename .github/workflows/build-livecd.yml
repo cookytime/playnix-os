@@ -22,7 +22,7 @@ jobs:
 
           # Crear contenedor con privilegios necesarios
           docker run -d --name arch-builder --privileged \
-            -v ${{ github.workspace }}:/workspace \
+            -v $PWD:/host-workspace \
             archlinux:latest sleep infinity
 
           # Actualizar sistema y instalar dependencias
@@ -32,10 +32,10 @@ jobs:
       - name: Create archiso profile
         run: |
           # Ejecutar dentro del contenedor de Arch
-          docker exec -w /workspace arch-builder bash -c '
-          # Crear directorio de trabajo
-          mkdir -p archiso-kde
-          cd archiso-kde
+          docker exec arch-builder bash -c '
+          # Crear directorio de trabajo en el contenedor
+          mkdir -p /build/archiso-kde
+          cd /build/archiso-kde
 
           # Copiar perfil base de archiso
           cp -r /usr/share/archiso/configs/releng/* .
@@ -103,7 +103,9 @@ jobs:
 
       - name: Configure automatic login
         run: |
-          docker exec -w /workspace/archiso-kde arch-builder bash -c '
+          docker exec arch-builder bash -c '
+          cd /build/archiso-kde
+
           # Crear configuración de SDDM para autologin
           mkdir -p airootfs/etc/sddm.conf.d
           cat > airootfs/etc/sddm.conf.d/autologin.conf << "EOF"
@@ -178,7 +180,9 @@ jobs:
 
       - name: Configure boot parameters
         run: |
-          docker exec -w /workspace/archiso-kde arch-builder bash -c '
+          docker exec arch-builder bash -c '
+          cd /build/archiso-kde
+
           # Configurar GRUB para arranque automático
           mkdir -p efiboot/loader/entries
           cat > efiboot/loader/entries/archiso-x86_64-linux.conf << "EOF"
@@ -195,7 +199,9 @@ jobs:
 
       - name: Build ISO
         run: |
-          docker exec -w /workspace/archiso-kde arch-builder bash -c '
+          docker exec arch-builder bash -c '
+          cd /build/archiso-kde
+
           # Crear el ISO
           mkarchiso -v -w work -o out .
 
@@ -203,9 +209,11 @@ jobs:
           ls -la out/
           '
 
+          # Crear directorio de salida en el host
+          mkdir -p iso-output
+
           # Copiar ISO al workspace del host
-          mkdir -p /workspace/iso-output
-          docker cp arch-builder:/workspace/archiso-kde/out/. ./iso-output/
+          docker cp arch-builder:/build/archiso-kde/out/. ./iso-output/
 
       - name: Cleanup container
         run: |
