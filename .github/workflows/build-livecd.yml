@@ -417,9 +417,6 @@ jobs:
 
           # Crear el ISO
           mkarchiso -v -w work -o out .
-
-          # Listar archivos generados
-          ls -la out/
           '
 
           # Crear directorio de salida en el host
