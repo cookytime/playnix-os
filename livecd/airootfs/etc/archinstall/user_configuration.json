@@ -243,5 +243,6 @@
   "services": [],
   "swap": true,
   "timezone": "UTC",
-  "version": null
+  "version": null,
+  "post_install": ["bash /etc/archinstall/post_install.sh"]
 }

@@ -35,15 +35,16 @@ jobs:
         run: |
           docker exec arch-builder bash -c '
           cd /build/archiso-kde
-          cp -r /usr/share/archiso/configs/releng/* .
-          chmod +x airootfs/usr/local/bin/arch-installer
           mkdir -p airootfs/root/Desktop
-          chmod +x ./airootfs/etc/skel/Desktop/*.desktop
+          cp -r /usr/share/archiso/configs/releng/* .
           cp airootfs/etc/skel/Desktop/*.desktop airootfs/root/Desktop/
-          chmod +x ./airootfs/root/Desktop/*.desktop
+          chmod +x airootfs/usr/local/bin/arch-installer
+          chmod +x airootfs/etc/skel/Desktop/*.desktop
+          chmod +x airootfs/root/Desktop/*.desktop
           chmod +x airootfs/usr/local/bin/arch-installer
           chmod +x airootfs/usr/local/bin/livecd-loading
           chmod +x airootfs/root/customize_airootfs.sh
+          chmod +x /etc/archinstall/post_install.sh
           '
 
       - name: Build ISO
