@@ -172,9 +172,6 @@ jobs:
       - name: Create archinstall configuration
         run: |
 
-          DEVICE="/dev/nvme0n1"
-          TOTAL_SIZE=$(sudo blockdev --getsize64 $DEVICE)
-          AVAILABLE_GIB=$(( (TOTAL_SIZE / 1073741824) - 2 ))
 
           docker exec arch-builder bash -c '
           cd /build/archiso-kde
@@ -240,7 +237,7 @@ jobs:
                           "value": 512
                         },
                         "unit": "GiB",
-                        "value": $AVAILABLE_GIB
+                        "value": 99999999
                       },
                       "start": {
                         "sector_size": {
@@ -452,6 +449,12 @@ jobs:
           # Crear script wrapper para detección automática de disco
           cat > airootfs/usr/local/bin/arch-installer << "INSTALLEREOF"
           #!/bin/bash
+
+          DEVICE="/dev/nvme0n1"
+          TOTAL_SIZE=$(sudo blockdev --getsize64 $DEVICE)
+          AVAILABLE_GIB=$(( (TOTAL_SIZE / 1073741824) - 2 ))
+
+          sudo sed -i "s/99999999/$AVAILABLE_GIB/" /etc/archinstall/user_configuration.json
 
           # PlayNix Arch Linux Installer - Usando archinstall oficial
           sudo archinstall --config /etc/archinstall/user_configuration.json --creds /etc/archinstall/user_credentials.json --silent
