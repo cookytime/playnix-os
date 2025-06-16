@@ -663,7 +663,7 @@ jobs:
 
           # Configurar Plymouth para splash screen
           if command -v plymouth-set-default-theme &> /dev/null; then
-            plymouth-set-default-theme bgrt
+            plymouth-set-default-theme script
           fi
 
           # Limpiar cache de pacman
@@ -796,7 +796,7 @@ jobs:
           mkdir -p airootfs/etc/plymouth
           cat > airootfs/etc/plymouth/plymouthd.conf << "PLYMOUTHEOF"
           [Daemon]
-          Theme=bgrt
+          Theme=script
           ShowDelay=0
           DeviceTimeout=5
           PLYMOUTHEOF
