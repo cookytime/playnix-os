@@ -1,0 +1,10 @@
+#!/bin/bash
+
+DEVICE="/dev/nvme0n1"
+TOTAL_SIZE=$(sudo blockdev --getsize64 $DEVICE)
+AVAILABLE_GIB=$(( (TOTAL_SIZE / 1073741824) - 2 ))
+
+sudo sed -i "s/99999999/$AVAILABLE_GIB/" /etc/archinstall/user_configuration.json
+
+# PlayNix Arch Linux Installer - Usando archinstall oficial
+sudo archinstall --config /etc/archinstall/user_configuration.json --creds /etc/archinstall/user_credentials.json --silent

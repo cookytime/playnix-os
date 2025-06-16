@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=Install Arch Linux
+Comment=Install Arch Linux
+Exec=konsole --hold -e sudo arch-installer
+Icon=system-software-install
+Terminal=false
+Type=Application

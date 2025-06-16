@@ -1,0 +1,14 @@
+[Unit]
+Description=LiveCD Loading Screen
+After=getty.target
+Before=sddm.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/livecd-loading
+StandardOutput=tty
+TTYPath=/dev/tty1
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
