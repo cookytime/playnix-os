@@ -57,7 +57,7 @@ chown -R liveuser:liveuser /home/liveuser || true
 
 # Configure Plymouth splash screen if present
 if command -v plymouth-set-default-theme &> /dev/null; then
-  plymouth-set-default-theme bgrt
+  plymouth-set-default-theme script
 fi
 
 # Clean pacman cache
