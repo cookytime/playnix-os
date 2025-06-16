@@ -63,6 +63,15 @@ fi
 # Clean pacman cache
 pacman -Scc --noconfirm || true
 
+#Init pacman
+rm -rf /etc/pacman.d/gnupg
+pacman-key --init
+pacman-key --populate archlinux
+chown -R root:root /etc/pacman.d/gnupg
+chmod -R 700 /etc/pacman.d/gnupg
+
+sed -i '/Worldwide/ {n;s/^#Server/Server/}' /etc/pacman.d/mirrorlist
+
 # yay
 cd /tmp
 git clone https://aur.archlinux.org/yay.git
