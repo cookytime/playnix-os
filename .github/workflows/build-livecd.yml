@@ -34,26 +34,17 @@ jobs:
       - name: Create archiso profile
         run: |
           docker exec arch-builder bash -c '
-          # Crear directorio de trabajo
           mkdir -p /build/archiso-kde
           cd /build/archiso-kde
-
-          # Copiar perfil base de archiso
           cp -r /usr/share/archiso/configs/releng/* . '
 
       - name: Create archinstall configuration
         run: |
-
-
           docker exec arch-builder bash -c '
           cd /build/archiso-kde
-          mkdir -p airootfs/usr/local/bin
-          mkdir -p airootfs/etc/archinstall
-
-          # Crear user_configuration.json (tu configuración corregida)
           pwd
           ls -la
-          chmod +x airootfs/usr/local/bin/arch-installer
+          chmod +x ./airootfs/usr/local/bin/arch-installer
           '
 
       - name: Configure desktop entries
@@ -63,9 +54,9 @@ jobs:
           mkdir -p airootfs/etc/skel/Desktop
           mkdir -p airootfs/root/Desktop
 
-          chmod +x airootfs/etc/skel/Desktop/*.desktop
+          chmod +x ./airootfs/etc/skel/Desktop/*.desktop
           cp airootfs/etc/skel/Desktop/*.desktop airootfs/root/Desktop/
-          chmod +x airootfs/root/Desktop/*.desktop
+          chmod +x ./airootfs/root/Desktop/*.desktop
           '
 
       - name: Create pacman.conf
