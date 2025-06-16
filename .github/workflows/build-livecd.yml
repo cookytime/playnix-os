@@ -24,7 +24,7 @@ jobs:
 
           # Crear contenedor con privilegios necesarios
           docker run -d --name arch-builder --privileged \
-            -v $PWD:/host-workspace/build/archiso-kde \
+            -v $PWD/livecd:/host-workspace/build/archiso-kde \
             archlinux:latest sleep infinity
 
           # Actualizar sistema y instalar dependencias
