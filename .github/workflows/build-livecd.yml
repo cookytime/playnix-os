@@ -41,7 +41,7 @@ jobs:
           # Copiar perfil base de archiso
           cp -r /usr/share/archiso/configs/releng/* .
 
-          # Crear lista de paquetes personalizada
+          # Crear lista de paquetes personalizada (añadiendo herramientas necesarias)
           cat > packages.x86_64 << "PKGEOF"
           # Base system
           base
@@ -166,6 +166,10 @@ jobs:
 
           # Plymouth para splash screen
           plymouth
+
+          # Herramientas adicionales para configuración de escritorio
+          xdg-utils
+          xdg-user-dirs
           PKGEOF
           '
 
@@ -407,7 +411,7 @@ jobs:
               "type": "nm"
             },
             "ntp": true,
-            "packages": ["base-devel", "curl", "firefox", "git", "nano", "plymouth", "gwenview"],
+            "packages": ["base-devel", "curl", "firefox", "git", "nano", "plymouth", "gwenview", "xdg-utils", "xdg-user-dirs"],
             "parallel_downloads": 0,
             "profile_config": {
               "gfx_driver": "AMD / ATI (open-source)",
@@ -461,50 +465,68 @@ jobs:
           # Crear directorio Desktop si no existe
           mkdir -p "$DESKTOP_DIR"
 
-          cat > "$DESKTOP_DIR/EmuDeck.desktop" << "TERMINALEOF"
+          # Icono para Terminal/Konsole
+          cat > "$DESKTOP_DIR/Terminal.desktop" << "TERMINALEOF"
           [Desktop Entry]
-          Comment[en_US]=
-          Comment=
-          Exec=sh -c 'curl -L https://raw.githubusercontent.com/dragoonDorise/EmuDeck/main/install.sh | bash'
-          GenericName[en_US]=
-          GenericName=
-          MimeType=
-          Name[en]=Install EmuDeck
-          Name[es]=Instalar EmuDeck
-          Name=Install EmuDeck
-          Path=
-          StartupNotify=false
-          Terminal=true
-          TerminalOptions=
+          Version=1.0
           Type=Application
-          X-DBUS-ServiceName=
-          X-DBUS-StartupType=
-          X-KDE-SubstituteUID=false
-          X-KDE-Username=
+          Name=Terminal
+          Name[es]=Terminal
+          Comment=Terminal Emulator
+          Comment[es]=Emulador de Terminal
+          Exec=konsole
+          Icon=utilities-terminal
+          Terminal=false
+          Categories=System;TerminalEmulator;
+          Keywords=shell;prompt;command;commandline;cmd;
           TERMINALEOF
 
-          cat > "$DESKTOP_DIR/enable-gaming.desktop" << "SETTINGSEOF"
+          # Icono para Administrador de Archivos
+          cat > "$DESKTOP_DIR/File Manager.desktop" << "FILEEOF"
           [Desktop Entry]
-          Comment[en_US]=
-          Comment=
-          Exec=sh -c 'curl -L https://raw.githubusercontent.com/Playnix-io/enable-gaming-mode/main/init.sh | bash'
-          GenericName[en_US]=
-          GenericName=
-          MimeType=
-          Name[en]=Enable Gaming Mode
-          Name[es]=Activar Gaming Mode
-          Name=Enable Gaming Mode
-          Path=
-          StartupNotify=false
-          Terminal=true
-          TerminalOptions=
+          Version=1.0
           Type=Application
-          X-DBUS-ServiceName=
-          X-DBUS-StartupType=
-          X-KDE-SubstituteUID=false
-          X-KDE-Username=
-          Icon=applications-games
+          Name=File Manager
+          Name[es]=Administrador de Archivos
+          Comment=File Manager
+          Comment[es]=Administrador de Archivos
+          Exec=dolphin
+          Icon=system-file-manager
+          Terminal=false
+          Categories=System;FileManager;
+          Keywords=folder;manager;explore;disk;filesystem;
+          FILEEOF
+
+          # Icono para Configuración del Sistema
+          cat > "$DESKTOP_DIR/System Settings.desktop" << "SETTINGSEOF"
+          [Desktop Entry]
+          Version=1.0
+          Type=Application
+          Name=System Settings
+          Name[es]=Configuración del Sistema
+          Comment=Configure your system
+          Comment[es]=Configura tu sistema
+          Exec=systemsettings5
+          Icon=preferences-system
+          Terminal=false
+          Categories=Settings;
+          Keywords=configuration;settings;preferences;
           SETTINGSEOF
+
+          # Icono para Firefox
+          cat > "$DESKTOP_DIR/Firefox.desktop" << "FIREFOXEOF"
+          [Desktop Entry]
+          Version=1.0
+          Type=Application
+          Name=Firefox
+          Comment=Web Browser
+          Comment[es]=Navegador Web
+          Exec=firefox
+          Icon=firefox
+          Terminal=false
+          Categories=Network;WebBrowser;
+          Keywords=web;browser;internet;
+          FIREFOXEOF
 
           # Establecer permisos y propietario correcto
           chown -R $USERNAME:$USERNAME "$DESKTOP_DIR"
@@ -547,7 +569,7 @@ jobs:
 
           # Configurar bashrc con alias útiles
           USER_HOME="/home/playnix"
-          cat >> "$USER_HOME/.bashrc" << EOF
+          cat >> "\$USER_HOME/.bashrc" << 'BASHEOF'
 
           # Aliases útiles
           alias ll='ls -alF'
@@ -563,7 +585,9 @@ jobs:
           echo "¡Bienvenido a tu nuevo sistema Arch Linux con KDE!"
           echo "Usuario: playnix"
           echo ""
-          EOF
+          BASHEOF
+
+          chown playnix:playnix "\$USER_HOME/.bashrc"
 
           chown playnix:playnix "$USER_HOME/.bashrc"
 
@@ -1022,6 +1046,20 @@ jobs:
           name: Arch Linux KDE Live CD v${{ github.run_number }}
           body: |
             # 🐧 Arch Linux KDE Live CD
+
+            ## Características
+            - ✨ Pantalla de carga personalizada con animación
+            - 🖥️ Entorno KDE Plasma completo
+            - 📦 Instalador automático preconfigurado
+            - 🎨 Interfaz gráfica de bienvenida
+            - 🔧 Herramientas de particionado incluidas
+
+            ## Opciones de arranque
+            - **Modo normal**: Con splash screen y carga silenciosa
+            - **Modo verbose**: Muestra todos los mensajes del sistema
+            - **Modo texto**: Arranque directo a consola
+
+            Usuario por defecto: `liveuser` (sin contraseña)
           files: iso-output/*.iso
           draft: false
           prerelease: false
