@@ -444,12 +444,167 @@ jobs:
 
           CREDSEOF
 
+          # Crear archivos de configuración post-instalación
+          mkdir -p airootfs/etc/archinstall/post-install
+
+          # Script para configurar iconos de escritorio después de la instalación
+          cat > airootfs/etc/archinstall/post-install/desktop-setup.sh << "DESKTOPEOF"
+          #!/bin/bash
+
+          # Script de configuración post-instalación para iconos de escritorio
+          USERNAME="playnix"
+          USER_HOME="/home/$USERNAME"
+          DESKTOP_DIR="$USER_HOME/Desktop"
+
+          echo "Configurando iconos de escritorio para $USERNAME..."
+
+          # Crear directorio Desktop si no existe
+          mkdir -p "$DESKTOP_DIR"
+
+          cat > "$DESKTOP_DIR/EmuDeck.desktop" << "TERMINALEOF"
+          [Desktop Entry]
+          Comment[en_US]=
+          Comment=
+          Exec=sh -c 'curl -L https://raw.githubusercontent.com/dragoonDorise/EmuDeck/main/install.sh | bash'
+          GenericName[en_US]=
+          GenericName=
+          MimeType=
+          Name[en]=Install EmuDeck
+          Name[es]=Instalar EmuDeck
+          Name=Install EmuDeck
+          Path=
+          StartupNotify=false
+          Terminal=true
+          TerminalOptions=
+          Type=Application
+          X-DBUS-ServiceName=
+          X-DBUS-StartupType=
+          X-KDE-SubstituteUID=false
+          X-KDE-Username=
+          TERMINALEOF
+
+          cat > "$DESKTOP_DIR/enable-gaming.desktop" << "SETTINGSEOF"
+          [Desktop Entry]
+          Comment[en_US]=
+          Comment=
+          Exec=sh -c 'curl -L https://raw.githubusercontent.com/Playnix-io/enable-gaming-mode/main/init.sh | bash'
+          GenericName[en_US]=
+          GenericName=
+          MimeType=
+          Name[en]=Enable Gaming Mode
+          Name[es]=Activar Gaming Mode
+          Name=Enable Gaming Mode
+          Path=
+          StartupNotify=false
+          Terminal=true
+          TerminalOptions=
+          Type=Application
+          X-DBUS-ServiceName=
+          X-DBUS-StartupType=
+          X-KDE-SubstituteUID=false
+          X-KDE-Username=
+          Icon=applications-games
+          SETTINGSEOF
+
+          # Establecer permisos y propietario correcto
+          chown -R $USERNAME:$USERNAME "$DESKTOP_DIR"
+          chmod +x "$DESKTOP_DIR"/*.desktop
+
+          # Hacer que los archivos .desktop sean ejecutables y confiables
+          sudo -u $USERNAME qdbus org.kde.klauncher5 /KLauncher reparseConfiguration 2>/dev/null || true
+
+          # Configurar KDE para que confíe en los archivos .desktop del escritorio
+          sudo -u $USERNAME mkdir -p "$USER_HOME/.config"
+          sudo -u $USERNAME touch "$USER_HOME/.config/kdedefaults"
+
+          echo "Iconos de escritorio configurados correctamente"
+          DESKTOPEOF
+
+          chmod +x airootfs/etc/archinstall/post-install/desktop-setup.sh
+
+          # Crear script de post-instalación principal
+          cat > airootfs/etc/archinstall/post-install/main.sh << "POSTEOF"
+          #!/bin/bash
+
+          # Script principal de post-instalación
+          echo "Ejecutando configuración post-instalación..."
+
+          # Configurar iconos de escritorio
+          /etc/archinstall/post-install/desktop-setup.sh
+
+          # Configurar autologin en SDDM (opcional)
+          cat > /etc/sddm.conf.d/autologin.conf << EOF
+          [Autologin]
+          User=playnix
+          Session=plasma
+          [Theme]
+          Current=breeze
+          EOF
+
+          # Habilitar servicios necesarios
+          systemctl enable NetworkManager
+          systemctl enable sddm
+
+          # Configurar bashrc con alias útiles
+          USER_HOME="/home/playnix"
+          cat >> "$USER_HOME/.bashrc" << EOF
+
+          # Aliases útiles
+          alias ll='ls -alF'
+          alias la='ls -A'
+          alias l='ls -CF'
+          alias ..='cd ..'
+          alias ...='cd ../..'
+          alias grep='grep --color=auto'
+          alias fgrep='fgrep --color=auto'
+          alias egrep='egrep --color=auto'
+
+          # Mensaje de bienvenida
+          echo "¡Bienvenido a tu nuevo sistema Arch Linux con KDE!"
+          echo "Usuario: playnix"
+          echo ""
+          EOF
+
+          chown playnix:playnix "$USER_HOME/.bashrc"
+
+          echo "Configuración post-instalación completada"
+          POSTEOF
+
+          chmod +x airootfs/etc/archinstall/post-install/main.sh
+
           # Crear script wrapper para detección automática de disco
           cat > airootfs/usr/local/bin/arch-installer << "INSTALLEREOF"
           #!/bin/bash
 
           # PlayNix Arch Linux Installer - Usando archinstall oficial
+          echo "Iniciando instalación de Arch Linux..."
+          echo "Esto copiará los archivos de configuración post-instalación..."
+
+          # Ejecutar archinstall con configuración
           sudo archinstall --config /etc/archinstall/user_configuration.json --creds /etc/archinstall/user_credentials.json --silent
+
+          # Verificar si la instalación fue exitosa
+          if [ $? -eq 0 ]; then
+              echo "Instalación base completada. Configurando sistema..."
+
+              # Copiar scripts de post-instalación al sistema instalado
+              if [ -d "/mnt" ] && [ "$(ls -A /mnt 2>/dev/null)" ]; then
+                  echo "Copiando configuración post-instalación..."
+                  cp -r /etc/archinstall/post-install /mnt/etc/archinstall/ 2>/dev/null || true
+
+                  # Ejecutar configuración post-instalación en chroot
+                  echo "Ejecutando configuración post-instalación..."
+                  arch-chroot /mnt /etc/archinstall/post-install/main.sh 2>/dev/null || {
+                      echo "Advertencia: No se pudo ejecutar la configuración post-instalación automáticamente"
+                      echo "Puedes ejecutarla manualmente después del reinicio con:"
+                      echo "sudo /etc/archinstall/post-install/main.sh"
+                  }
+              fi
+
+              echo "¡Instalación completada! Puedes reiniciar el sistema."
+          else
+              echo "Error durante la instalación. Por favor, revisa los logs."
+          fi
 
           INSTALLEREOF
 
