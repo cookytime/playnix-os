@@ -34,8 +34,10 @@ jobs:
       - name: Create archiso profile
         run: |
           docker exec arch-builder bash -c '
-          mkdir -p /build/archiso-kde
+          pwd
+          ls -la
           cd /build/archiso-kde
+          ls -la
           cp -r /usr/share/archiso/configs/releng/* . '
 
       - name: Create archinstall configuration
