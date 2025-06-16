@@ -41,7 +41,7 @@ jobs:
           # Copiar perfil base de archiso
           cp -r /usr/share/archiso/configs/releng/* .
 
-          # Crear lista de paquetes personalizada (añadiendo herramientas necesarias)
+          # Crear lista de paquetes personalizada
           cat > packages.x86_64 << "PKGEOF"
           # Base system
           base
@@ -166,10 +166,6 @@ jobs:
 
           # Plymouth para splash screen
           plymouth
-
-          # Herramientas adicionales para configuración de escritorio
-          xdg-utils
-          xdg-user-dirs
           PKGEOF
           '
 
@@ -238,8 +234,8 @@ jobs:
                           "unit": "B",
                           "value": 512
                         },
-                        "unit": "B",
-                        "value": "0"
+                        "unit": "%",
+                        "value": "100%FREE"
                       },
                       "start": {
                         "sector_size": {
@@ -411,7 +407,7 @@ jobs:
               "type": "nm"
             },
             "ntp": true,
-            "packages": ["base-devel", "curl", "firefox", "git", "nano", "plymouth", "gwenview", "xdg-utils", "xdg-user-dirs"],
+            "packages": ["base-devel", "curl", "firefox", "git", "nano", "plymouth", "gwenview"],
             "parallel_downloads": 0,
             "profile_config": {
               "gfx_driver": "AMD / ATI (open-source)",
@@ -448,187 +444,12 @@ jobs:
 
           CREDSEOF
 
-          # Crear archivos de configuración post-instalación
-          mkdir -p airootfs/etc/archinstall/post-install
-
-          # Script para configurar iconos de escritorio después de la instalación
-          cat > airootfs/etc/archinstall/post-install/desktop-setup.sh << "DESKTOPEOF"
-          #!/bin/bash
-
-          # Script de configuración post-instalación para iconos de escritorio
-          USERNAME="playnix"
-          USER_HOME="/home/$USERNAME"
-          DESKTOP_DIR="$USER_HOME/Desktop"
-
-          echo "Configurando iconos de escritorio para $USERNAME..."
-
-          # Crear directorio Desktop si no existe
-          mkdir -p "$DESKTOP_DIR"
-
-          # Icono para Terminal/Konsole
-          cat > "$DESKTOP_DIR/Terminal.desktop" << "TERMINALEOF"
-          [Desktop Entry]
-          Version=1.0
-          Type=Application
-          Name=Terminal
-          Name[es]=Terminal
-          Comment=Terminal Emulator
-          Comment[es]=Emulador de Terminal
-          Exec=konsole
-          Icon=utilities-terminal
-          Terminal=false
-          Categories=System;TerminalEmulator;
-          Keywords=shell;prompt;command;commandline;cmd;
-          TERMINALEOF
-
-          # Icono para Administrador de Archivos
-          cat > "$DESKTOP_DIR/File Manager.desktop" << "FILEEOF"
-          [Desktop Entry]
-          Version=1.0
-          Type=Application
-          Name=File Manager
-          Name[es]=Administrador de Archivos
-          Comment=File Manager
-          Comment[es]=Administrador de Archivos
-          Exec=dolphin
-          Icon=system-file-manager
-          Terminal=false
-          Categories=System;FileManager;
-          Keywords=folder;manager;explore;disk;filesystem;
-          FILEEOF
-
-          # Icono para Configuración del Sistema
-          cat > "$DESKTOP_DIR/System Settings.desktop" << "SETTINGSEOF"
-          [Desktop Entry]
-          Version=1.0
-          Type=Application
-          Name=System Settings
-          Name[es]=Configuración del Sistema
-          Comment=Configure your system
-          Comment[es]=Configura tu sistema
-          Exec=systemsettings5
-          Icon=preferences-system
-          Terminal=false
-          Categories=Settings;
-          Keywords=configuration;settings;preferences;
-          SETTINGSEOF
-
-          # Icono para Firefox
-          cat > "$DESKTOP_DIR/Firefox.desktop" << "FIREFOXEOF"
-          [Desktop Entry]
-          Version=1.0
-          Type=Application
-          Name=Firefox
-          Comment=Web Browser
-          Comment[es]=Navegador Web
-          Exec=firefox
-          Icon=firefox
-          Terminal=false
-          Categories=Network;WebBrowser;
-          Keywords=web;browser;internet;
-          FIREFOXEOF
-
-          # Establecer permisos y propietario correcto
-          chown -R $USERNAME:$USERNAME "$DESKTOP_DIR"
-          chmod +x "$DESKTOP_DIR"/*.desktop
-
-          # Hacer que los archivos .desktop sean ejecutables y confiables
-          sudo -u $USERNAME qdbus org.kde.klauncher5 /KLauncher reparseConfiguration 2>/dev/null || true
-
-          # Configurar KDE para que confíe en los archivos .desktop del escritorio
-          sudo -u $USERNAME mkdir -p "$USER_HOME/.config"
-          sudo -u $USERNAME touch "$USER_HOME/.config/kdedefaults"
-
-          echo "Iconos de escritorio configurados correctamente"
-          DESKTOPEOF
-
-          chmod +x airootfs/etc/archinstall/post-install/desktop-setup.sh
-
-          # Crear script de post-instalación principal
-          cat > airootfs/etc/archinstall/post-install/main.sh << "POSTEOF"
-          #!/bin/bash
-
-          # Script principal de post-instalación
-          echo "Ejecutando configuración post-instalación..."
-
-          # Configurar iconos de escritorio
-          /etc/archinstall/post-install/desktop-setup.sh
-
-          # Configurar autologin en SDDM (opcional)
-          cat > /etc/sddm.conf.d/autologin.conf << EOF
-          [Autologin]
-          User=playnix
-          Session=plasma
-          [Theme]
-          Current=breeze
-          EOF
-
-          # Habilitar servicios necesarios
-          systemctl enable NetworkManager
-          systemctl enable sddm
-
-          # Configurar bashrc con alias útiles
-          USER_HOME="/home/playnix"
-          cat >> "\$USER_HOME/.bashrc" << 'BASHEOF'
-
-          # Aliases útiles
-          alias ll='ls -alF'
-          alias la='ls -A'
-          alias l='ls -CF'
-          alias ..='cd ..'
-          alias ...='cd ../..'
-          alias grep='grep --color=auto'
-          alias fgrep='fgrep --color=auto'
-          alias egrep='egrep --color=auto'
-
-          # Mensaje de bienvenida
-          echo "¡Bienvenido a tu nuevo sistema Arch Linux con KDE!"
-          echo "Usuario: playnix"
-          echo ""
-          BASHEOF
-
-          chown playnix:playnix "\$USER_HOME/.bashrc"
-
-          chown playnix:playnix "$USER_HOME/.bashrc"
-
-          echo "Configuración post-instalación completada"
-          POSTEOF
-
-          chmod +x airootfs/etc/archinstall/post-install/main.sh
-
           # Crear script wrapper para detección automática de disco
           cat > airootfs/usr/local/bin/arch-installer << "INSTALLEREOF"
           #!/bin/bash
 
           # PlayNix Arch Linux Installer - Usando archinstall oficial
-          echo "Iniciando instalación de Arch Linux..."
-          echo "Esto copiará los archivos de configuración post-instalación..."
-
-          # Ejecutar archinstall con configuración
           sudo archinstall --config /etc/archinstall/user_configuration.json --creds /etc/archinstall/user_credentials.json --silent
-
-          # Verificar si la instalación fue exitosa
-          if [ $? -eq 0 ]; then
-              echo "Instalación base completada. Configurando sistema..."
-
-              # Copiar scripts de post-instalación al sistema instalado
-              if [ -d "/mnt" ] && [ "$(ls -A /mnt 2>/dev/null)" ]; then
-                  echo "Copiando configuración post-instalación..."
-                  cp -r /etc/archinstall/post-install /mnt/etc/archinstall/ 2>/dev/null || true
-
-                  # Ejecutar configuración post-instalación en chroot
-                  echo "Ejecutando configuración post-instalación..."
-                  arch-chroot /mnt /etc/archinstall/post-install/main.sh 2>/dev/null || {
-                      echo "Advertencia: No se pudo ejecutar la configuración post-instalación automáticamente"
-                      echo "Puedes ejecutarla manualmente después del reinicio con:"
-                      echo "sudo /etc/archinstall/post-install/main.sh"
-                  }
-              fi
-
-              echo "¡Instalación completada! Puedes reiniciar el sistema."
-          else
-              echo "Error durante la instalación. Por favor, revisa los logs."
-          fi
 
           INSTALLEREOF
 
@@ -1046,20 +867,6 @@ jobs:
           name: Arch Linux KDE Live CD v${{ github.run_number }}
           body: |
             # 🐧 Arch Linux KDE Live CD
-
-            ## Características
-            - ✨ Pantalla de carga personalizada con animación
-            - 🖥️ Entorno KDE Plasma completo
-            - 📦 Instalador automático preconfigurado
-            - 🎨 Interfaz gráfica de bienvenida
-            - 🔧 Herramientas de particionado incluidas
-
-            ## Opciones de arranque
-            - **Modo normal**: Con splash screen y carga silenciosa
-            - **Modo verbose**: Muestra todos los mensajes del sistema
-            - **Modo texto**: Arranque directo a consola
-
-            Usuario por defecto: `liveuser` (sin contraseña)
           files: iso-output/*.iso
           draft: false
           prerelease: false
