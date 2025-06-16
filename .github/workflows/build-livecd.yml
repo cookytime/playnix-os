@@ -197,13 +197,18 @@ jobs:
           echo "🛠️ Instalador:"
           ls -la airootfs/usr/local/bin/arch-installer 2>/dev/null || echo "❌ arch-installer no encontrado"
           echo ""
-          echo "🥾 Configuración de boot:"
-          ls -la grub/ efiboot/ syslinux/ 2>/dev/null || echo "ℹ️ Usando configuración de boot por defecto"
+
+          # Verificar y contar paquetes
+          echo "📦 Análisis de paquetes:"
+          echo "Total de paquetes: $(grep -v "^#" packages.x86_64 | grep -v "^$" | wc -l)"
+          echo "Primeros 10 paquetes:"
+          grep -v "^#" packages.x86_64 | grep -v "^$" | head -10
           echo ""
 
-          # Verificar contenido de packages.x86_64
-          echo "📦 Primeros paquetes en la lista:"
-          head -20 packages.x86_64
+          # Actualizar mirrors antes del build
+          echo "🌐 Actualizando mirrors para el build..."
+          reflector --country Spain,France,Germany,Netherlands --latest 10 --protocol https --sort rate --save /etc/pacman.d/mirrorlist
+          echo "✅ Mirrors actualizados"
           echo ""
 
           # Crear directorios necesarios
@@ -211,17 +216,25 @@ jobs:
 
           echo "🚀 Iniciando construcción de la ISO..."
           echo "⏰ Esto puede tomar 15-20 minutos..."
+          echo ""
 
-          # Ejecutar mkarchiso con manejo de errores mejorado
-          if mkarchiso -v -w work -o out . ; then
+          # Ejecutar mkarchiso con mejor captura de errores
+          set -o pipefail
+          if mkarchiso -v -w work -o out . 2>&1 | tee build.log ; then
             echo ""
             echo "✅ ¡ISO construida exitosamente!"
             echo "📁 Archivos generados:"
             ls -lh out/
           else
+            BUILD_EXIT_CODE=$?
             echo ""
-            echo "❌ Error en la construcción de la ISO"
-            echo "📋 Verificando logs..."
+            echo "❌ Error en la construcción de la ISO (código: $BUILD_EXIT_CODE)"
+            echo ""
+
+            # Mostrar las últimas líneas del build log
+            echo "=== ÚLTIMAS 50 LÍNEAS DEL BUILD LOG ==="
+            tail -50 build.log 2>/dev/null || echo "No se pudo acceder al log del build"
+            echo ""
 
             # Mostrar información de debug
             echo "=== INFORMACIÓN DE DEBUG ==="
@@ -229,39 +242,57 @@ jobs:
             ls -la
             echo ""
             echo "📁 Contenido del directorio work:"
-            ls -la work/ 2>/dev/null || echo "Directorio work no existe"
+            find work/ -maxdepth 2 -type d 2>/dev/null || echo "Directorio work no accesible"
             echo ""
             echo "📁 Contenido del directorio out:"
             ls -la out/ 2>/dev/null || echo "Directorio out no existe o está vacío"
             echo ""
             echo "💾 Espacio en disco:"
-            df -h
+            df -h | head -10
             echo ""
             echo "🧠 Memoria disponible:"
             free -h
             echo ""
-            echo "📄 Últimas líneas del log del sistema:"
-            tail -20 /var/log/pacman.log 2>/dev/null || echo "Log de pacman no disponible"
+            echo "🔍 Buscando errores específicos en el log..."
+            grep -i "error\|failed\|cannot\|not found" build.log | tail -10 2>/dev/null || echo "No se encontraron errores específicos"
+            echo ""
+            echo "📄 Log de pacman (últimas 10 líneas):"
+            tail -10 /var/log/pacman.log 2>/dev/null || echo "Log de pacman no disponible"
 
-            exit 1
+            exit $BUILD_EXIT_CODE
           fi
           '
 
           # Solo continuar si el build fue exitoso
-          if [ $? -eq 0 ]; then
+          BUILD_SUCCESS=$?
+          if [ $BUILD_SUCCESS -eq 0 ]; then
             # Crear directorio de salida en el host
             mkdir -p iso-output
 
             # Copiar ISO al workspace del host
             echo "📥 Copiando ISO al host..."
-            docker cp arch-builder:/build/archiso-kde/out/. ./iso-output/
+            if docker cp arch-builder:/build/archiso-kde/out/. ./iso-output/ 2>/dev/null; then
+              echo "✅ ISO copiada correctamente"
+            else
+              echo "❌ Error copiando la ISO"
+              exit 1
+            fi
 
             # Mostrar información del ISO generado
             echo "🎉 ISO lista:"
             ls -lh ./iso-output/
+
+            # Mostrar información adicional de la ISO
+            if ls ./iso-output/*.iso 1> /dev/null 2>&1; then
+              echo ""
+              echo "📊 Detalles de la ISO:"
+              for iso in ./iso-output/*.iso; do
+                echo "📁 $(basename "$iso"): $(du -h "$iso" | cut -f1)"
+              done
+            fi
           else
             echo "❌ El build falló, no se puede continuar"
-            exit 1
+            exit $BUILD_SUCCESS
           fi
 
       - name: Cleanup
