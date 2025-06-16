@@ -51,7 +51,8 @@ jobs:
           mkdir -p airootfs/etc/archinstall
 
           # Crear user_configuration.json (tu configuración corregida)
-
+          pwd
+          ls -la
           chmod +x airootfs/usr/local/bin/arch-installer
           '
 
