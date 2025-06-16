@@ -1,30 +1,35 @@
 #!/usr/bin/env bash
 set -e -u
 
-echo "Iniciando customización..."
+echo "Starting customization..."
 
 # Locale
-sed -i "s/#en_US.UTF-8/en_US.UTF-8/" /etc/locale.gen
-sed -i "s/#es_ES.UTF-8/es_ES.UTF-8/" /etc/locale.gen
-locale-gen
+sed -i "s/#en_US.UTF-8/en_US.UTF-8/" /etc/locale.gen || true
+sed -i "s/#es_ES.UTF-8/es_ES.UTF-8/" /etc/locale.gen || true
+locale-gen || true
 echo "LANG=en_US.UTF-8" > /etc/locale.conf
 echo "KEYMAP=es" > /etc/vconsole.conf
 
 # Timezone
 ln -sf /usr/share/zoneinfo/UTC /etc/localtime
 
-# Usuario
-useradd -m -G wheel,audio,video,storage,network -s /bin/bash liveuser
-passwd -d liveuser
-passwd -d root
+# User setup
+useradd -m -G wheel,audio,video,storage,network -s /bin/bash liveuser || true
+passwd -d liveuser || true
+passwd -d root || true
 echo "%wheel ALL=(ALL:ALL) NOPASSWD: ALL" >> /etc/sudoers
 
-# Servicios
-systemctl enable NetworkManager.service
-systemctl enable sddm.service
-systemctl enable livecd-loading.service
+# Enable systemd services, only if service file exists
+for service in NetworkManager sddm livecd-loading; do
+  if [ -f "/usr/lib/systemd/system/${service}.service" ]; then
+    ln -sf "/usr/lib/systemd/system/${service}.service" "/etc/systemd/system/multi-user.target.wants/${service}.service"
+  else
+    echo "Service ${service} not found, skipping enable."
+  fi
+done
 
-# SDDM autologin
+# SDDM autologin configuration
+mkdir -p /etc/sddm.conf.d
 cat > /etc/sddm.conf.d/autologin.conf << EOF
 [Autologin]
 User=liveuser
@@ -36,23 +41,24 @@ EOF
 # Hostname
 echo "archiso-kde" > /etc/hostname
 
-# Bashrc con información de bienvenida
+# Bashrc with welcome message for liveuser
+mkdir -p /home/liveuser
 cat >> /home/liveuser/.bashrc << EOF
 alias ll="ls -la"
 clear
 echo -e "\033[1;34m=== 🐧 Arch Linux KDE Live CD ===\033[0m"
-echo -e "\033[1;32mBienvenido al sistema Live de Arch Linux con KDE\033[0m"
-echo -e "\033[0;36mUsuario actual: liveuser (sin contraseña)\033[0m"
-echo -e "\033[0;36mPara instalar: Ejecuta el instalador desde el escritorio\033[0m"
+echo -e "\033[1;32mWelcome to the Arch Linux KDE Live system\033[0m"
+echo -e "\033[0;36mCurrent user: liveuser (no password)\033[0m"
+echo -e "\033[0;36mTo install: Run the installer from the desktop\033[0m"
 echo ""
 EOF
 
-chown -R liveuser:liveuser /home/liveuser
+chown -R liveuser:liveuser /home/liveuser || true
 
-# Configurar Plymouth para splash screen
+# Configure Plymouth splash screen if present
 if command -v plymouth-set-default-theme &> /dev/null; then
   plymouth-set-default-theme bgrt
 fi
 
-# Limpiar cache de pacman
-pacman -Scc --noconfirm
+# Clean pacman cache
+pacman -Scc --noconfirm || true
