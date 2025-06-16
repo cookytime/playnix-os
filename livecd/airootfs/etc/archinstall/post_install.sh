@@ -50,6 +50,12 @@ makepkg -si --noconfirm
 cd /
 rm -rf /tmp/yay
 
+#Plymouth Sweet Arch
+yay -S plymouth-theme-sweet-arch-git
+plymouth-set-default-theme -R sweet-arch
+
+
+
 #Desktop shortcuts
 mkdir -p "/home/playnix/Desktop"
 cp /etc/archinstall/*.desktop /home/playnix/Desktop/
