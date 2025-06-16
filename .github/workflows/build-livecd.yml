@@ -162,6 +162,7 @@ jobs:
 
           # Live system and installation tools
           arch-install-scripts
+          archinstall
           gparted
           testdisk
           ddrescue
@@ -179,16 +180,180 @@ jobs:
           PKGEOF
           '
 
-      - name: Create installer script
+      - name: Create archinstall configuration
         run: |
           docker exec arch-builder bash -c '
           cd /build/archiso-kde
           mkdir -p airootfs/usr/local/bin
+          mkdir -p airootfs/etc/archinstall
 
+          # Crear user_configuration.json (tu configuración corregida)
+          cat > airootfs/etc/archinstall/user_configuration.json << "CONFIGEOF"
+          {
+            "archinstall-language": "English",
+            "audio_config": {
+              "audio": "pipewire"
+            },
+            "bootloader": "Grub",
+            "custom_commands": [],
+            "disk_config": {
+              "btrfs_options": {
+                "snapshot_config": null
+              },
+              "config_type": "default_layout",
+              "device_modifications": [
+                {
+                  "device": "/dev/nvme0n1",
+                  "partitions": [
+                    {
+                      "btrfs": [],
+                      "dev_path": null,
+                      "flags": ["boot", "esp"],
+                      "fs_type": "fat32",
+                      "mount_options": [],
+                      "mountpoint": "/boot",
+                      "obj_id": "9302cd00-7e28-4c67-a0a7-3526ead7174a",
+                      "size": {
+                        "sector_size": {
+                          "unit": "B",
+                          "value": 512
+                        },
+                        "unit": "MiB",
+                        "value": 512
+                      },
+                      "start": {
+                        "sector_size": {
+                          "unit": "B",
+                          "value": 512
+                        },
+                        "unit": "MiB",
+                        "value": 1
+                      },
+                      "status": "create",
+                      "type": "primary"
+                    },
+                    {
+                      "btrfs": [],
+                      "dev_path": null,
+                      "flags": [],
+                      "fs_type": "swap",
+                      "mount_options": [],
+                      "mountpoint": null,
+                      "obj_id": "swap-partition-id",
+                      "size": {
+                        "sector_size": {
+                          "unit": "B",
+                          "value": 512
+                        },
+                        "unit": "GiB",
+                        "value": 4
+                      },
+                      "start": {
+                        "sector_size": {
+                          "unit": "B",
+                          "value": 512
+                        },
+                        "unit": "MiB",
+                        "value": 513
+                      },
+                      "status": "create",
+                      "type": "primary"
+                    },
+                    {
+                      "btrfs": [],
+                      "dev_path": null,
+                      "flags": [],
+                      "fs_type": "ext4",
+                      "mount_options": [],
+                      "mountpoint": "/",
+                      "obj_id": "b1b0fecf-9863-41c8-ad98-54e0cd26abc0",
+                      "size": {
+                        "sector_size": {
+                          "unit": "B",
+                          "value": 512
+                        },
+                        "unit": "%",
+                        "value": "100%FREE"
+                      },
+                      "start": {
+                        "sector_size": {
+                          "unit": "B",
+                          "value": 512
+                        },
+                        "unit": "GiB",
+                        "value": 4.5
+                      },
+                      "status": "create",
+                      "type": "primary"
+                    }
+                  ],
+                  "wipe": true
+                }
+              ]
+            },
+            "hostname": "playnix",
+            "kernels": ["linux"],
+            "locale_config": {
+              "kb_layout": "us",
+              "sys_enc": "UTF-8",
+              "sys_lang": "en_US.UTF-8"
+            },
+            "mirror_config": {
+              "custom_repositories": [],
+              "custom_servers": [],
+              "mirror_regions": {
+                "Spain": [
+                  "https://ftp.rediris.es/mirror/archlinux/$repo/os/$arch",
+                  "https://mirror.raiolanetworks.com/archlinux/$repo/os/$arch"
+                ]
+              },
+              "optional_repositories": []
+            },
+            "network_config": {
+              "type": "nm"
+            },
+            "ntp": true,
+            "packages": ["base-devel", "curl", "firefox", "git", "nano", "plymouth", "gwenview"],
+            "parallel_downloads": 0,
+            "profile_config": {
+              "gfx_driver": "All open-source",
+              "greeter": "sddm",
+              "profile": {
+                "custom_settings": {
+                  "KDE Plasma": {}
+                },
+                "details": ["KDE Plasma"],
+                "main": "Desktop"
+              }
+            },
+            "services": [],
+            "swap": true,
+            "timezone": "UTC",
+            "version": null
+          }
+          CONFIGEOF
+
+          # Crear user_credentials.json
+          cat > airootfs/etc/archinstall/user_credentials.json << "CREDSEOF"
+          {
+            "root_enc_password": null,
+            "users": [
+              {
+                "enc_password": "$y$j9T$KhIE2mo2XuF5jlv8me5rB.$JN3y4/uH9fq32Cm/sIMgvD8REfgNUhWBNpwIJofd6X8",
+                "groups": [],
+                "sudo": true,
+                "username": "playnix"
+              }
+            ]
+          }
+
+          CREDSEOF
+
+          # Crear script wrapper para detección automática de disco
           cat > airootfs/usr/local/bin/arch-installer << "INSTALLEREOF"
           #!/bin/bash
 
-          # Arch Linux Automatic Installer - 100% Automatico
+          # PlayNix Arch Linux Installer - Usando archinstall oficial
           set -e
 
           # Colores
@@ -214,317 +379,107 @@ jobs:
               echo -e "${BLUE}=== $1 ===${NC}"
           }
 
-          check_root() {
+          detect_disk() {
+              print_msg "Detectando disco de instalación..."
+
+              # Buscar discos NVMe primero
+              for disk in /dev/nvme*n1; do
+                  if [ -b "$disk" ]; then
+                      echo "$disk"
+                      return
+                  fi
+              done
+
+              # Buscar discos SATA/SCSI
+              for disk in /dev/sda /dev/sdb /dev/sdc; do
+                  if [ -b "$disk" ]; then
+                      echo "$disk"
+                      return
+                  fi
+              done
+
+              # Buscar discos virtuales
+              for disk in /dev/vda /dev/vdb; do
+                  if [ -b "$disk" ]; then
+                      echo "$disk"
+                      return
+                  fi
+              done
+
+              print_error "No se encontró ningún disco para instalar"
+              exit 1
+          }
+
+          main() {
+              print_title "🎮 INSTALADOR PLAYNIX - ARCH LINUX + KDE 🎮"
+
+              # Verificar permisos
               if [ $(id -u) -ne 0 ]; then
                   print_error "Este script debe ejecutarse como root"
                   exit 1
               fi
-          }
 
-          check_internet() {
-              print_msg "Verificando conexión a internet..."
-              if ! ping -c 1 archlinux.org > /dev/null 2>&1; then
-                  print_error "No hay conexión a internet"
-                  exit 1
-              fi
-              print_msg "Conexión a internet OK"
-          }
+              # Detectar disco
+              DISK=$(detect_disk)
+              print_msg "Disco detectado: $DISK"
 
-          detect_nvme() {
-              print_msg "Detectando disco NVMe..."
+              # Copiar configuraciones a temporal
+              cp /etc/archinstall/user_configuration.json /tmp/
+              cp /etc/archinstall/user_credentials.json /tmp/
 
-              # Buscar discos NVMe
-              NVME_DISK=""
-              for disk in /dev/nvme*n1; do
-                  if [ -b "$disk" ]; then
-                      NVME_DISK="$disk"
-                      break
-                  fi
+              # Actualizar configuración con el disco detectado
+              print_msg "Configurando instalación para $DISK..."
+              sed -i "s|/dev/nvme0n1|$DISK|g" /tmp/user_configuration.json
+
+              print_warning "⚠️  ATENCIÓN: SE INSTALARÁ EN $DISK"
+              print_warning "⚠️  TODOS LOS DATOS SERÁN ELIMINADOS"
+              print_msg "Usuario: playnix | Contraseña: playnix"
+              print_msg "Hostname: playnix"
+              print_msg "Entorno: KDE Plasma"
+              echo ""
+              print_msg "⏰ La instalación comenzará en 10 segundos..."
+              print_msg "❌ Presiona Ctrl+C para CANCELAR"
+
+              for i in {10..1}; do
+                  echo -ne "\r⏳ Iniciando en: $i segundos... "
+                  sleep 1
               done
+              echo ""
 
-              if [ -z "$NVME_DISK" ]; then
-                  print_error "No se encontró disco NVMe. Buscando alternativas..."
-                  # Buscar otros discos como respaldo
-                  for disk in /dev/sda /dev/sdb /dev/vda; do
-                      if [ -b "$disk" ]; then
-                          NVME_DISK="$disk"
-                          print_warning "Usando $disk como disco de instalación"
-                          break
-                      fi
-                  done
-              fi
+              print_title "🚀 INICIANDO INSTALACIÓN CON ARCHINSTALL"
 
-              if [ -z "$NVME_DISK" ]; then
-                  print_error "No se encontró ningún disco para instalar"
+              # Ejecutar archinstall
+              if archinstall --config /tmp/user_configuration.json --creds /tmp/user_credentials.json --silent; then
+                  print_title "🎉 ¡INSTALACIÓN COMPLETADA EXITOSAMENTE!"
+                  print_msg "✅ Sistema instalado en: $DISK"
+                  print_msg "✅ Usuario: playnix"
+                  print_msg "✅ Contraseña: playnix"
+                  print_msg "✅ Entorno: KDE Plasma con SDDM"
+                  print_warning "📱 Retira el USB de instalación antes de reiniciar"
+
+                  echo ""
+                  read -p "🔄 ¿Reiniciar ahora? (y/n): " reboot_choice
+                  if [ "$reboot_choice" = "y" ] || [ "$reboot_choice" = "Y" ]; then
+                      print_msg "🔄 Reiniciando en 5 segundos..."
+                      sleep 5
+                      reboot
+                  fi
+              else
+                  print_error "❌ Error durante la instalación"
+                  print_msg "📋 Verifica los logs de archinstall para más detalles"
                   exit 1
               fi
-
-              print_msg "Disco seleccionado: $NVME_DISK"
-              echo "$NVME_DISK"
           }
 
-          partition_disk_auto() {
-              local DISK="$1"
-              print_title "Particionando disco automáticamente: $DISK"
-
-              # Limpiar disco completamente
-              print_msg "Limpiando disco..."
-              wipefs -af "$DISK"
-              sgdisk --zap-all "$DISK"
-
-              # Crear tabla de particiones GPT
-              print_msg "Creando tabla de particiones GPT..."
-
-              if [ -d /sys/firmware/efi/efivars ]; then
-                  print_msg "Sistema UEFI - Creando particiones EFI + Root"
-                  # UEFI: EFI (512MB) + Root (resto)
-                  sgdisk -n 1:0:+512M -t 1:ef00 -c 1:"EFI" "$DISK"
-                  sgdisk -n 2:0:0 -t 2:8300 -c 2:"Root" "$DISK"
-
-                  # Variables para particiones
-                  EFI_PART="${DISK}p1"
-                  ROOT_PART="${DISK}p2"
-
-                  # Si es un disco SATA, usar formato /dev/sdaX
-                  if [[ "$DISK" == /dev/sd* ]]; then
-                      EFI_PART="${DISK}1"
-                      ROOT_PART="${DISK}2"
-                  fi
-              else
-                  print_msg "Sistema BIOS - Creando partición Root única"
-                  # BIOS: Solo Root
-                  sgdisk -n 1:0:0 -t 1:8300 -c 1:"Root" "$DISK"
-                  ROOT_PART="${DISK}p1"
-
-                  if [[ "$DISK" == /dev/sd* ]]; then
-                      ROOT_PART="${DISK}1"
-                  fi
-              fi
-
-              # Esperar a que el kernel reconozca las particiones
-              print_msg "Esperando reconocimiento de particiones..."
-              sleep 3
-              partprobe "$DISK"
-              sleep 2
-          }
-
-          format_partitions_auto() {
-              print_title "Formateando particiones automáticamente"
-
-              if [ -d /sys/firmware/efi/efivars ]; then
-                  print_msg "Formateando partición EFI: $EFI_PART"
-                  mkfs.fat -F32 "$EFI_PART"
-
-                  print_msg "Formateando partición Root: $ROOT_PART"
-                  mkfs.ext4 -F "$ROOT_PART"
-
-                  print_msg "Montando particiones..."
-                  mount "$ROOT_PART" /mnt
-                  mkdir -p /mnt/boot/efi
-                  mount "$EFI_PART" /mnt/boot/efi
-              else
-                  print_msg "Formateando partición Root: $ROOT_PART"
-                  mkfs.ext4 -F "$ROOT_PART"
-
-                  print_msg "Montando partición..."
-                  mount "$ROOT_PART" /mnt
-              fi
-          }
-
-          install_base_auto() {
-              print_title "Instalando sistema base automáticamente"
-
-              print_msg "Actualizando mirrors..."
-              reflector --country Spain,France,Germany --age 12 --protocol https --sort rate --save /etc/pacman.d/mirrorlist
-
-              print_msg "Instalando paquetes base..."
-              pacstrap /mnt base linux linux-firmware base-devel grub networkmanager
-
-              print_msg "Generando fstab..."
-              genfstab -U /mnt >> /mnt/etc/fstab
-          }
-
-          install_kde_auto() {
-              print_title "Instalando KDE Plasma automáticamente"
-
-              print_msg "Instalando KDE y aplicaciones..."
-              arch-chroot /mnt pacman -S --noconfirm \
-                  plasma-desktop \
-                  sddm \
-                  konsole \
-                  dolphin \
-                  kate \
-                  firefox \
-                  spectacle \
-                  okular \
-                  gwenview \
-                  ark \
-                  breeze \
-                  breeze-gtk \
-                  kde-gtk-config \
-                  plasma-nm \
-                  plasma-pa \
-                  powerdevil
-
-              print_msg "Habilitando SDDM..."
-              arch-chroot /mnt systemctl enable sddm.service
-          }
-
-          configure_system_auto() {
-              print_title "Configurando sistema automáticamente"
-
-              print_msg "Configurando zona horaria..."
-              arch-chroot /mnt ln -sf /usr/share/zoneinfo/Europe/Madrid /etc/localtime
-              arch-chroot /mnt hwclock --systohc
-
-              print_msg "Configurando idioma..."
-              arch-chroot /mnt sed -i "s/#es_ES.UTF-8/es_ES.UTF-8/" /etc/locale.gen
-              arch-chroot /mnt sed -i "s/#en_US.UTF-8/en_US.UTF-8/" /etc/locale.gen
-              arch-chroot /mnt locale-gen
-              echo "LANG=es_ES.UTF-8" > /mnt/etc/locale.conf
-              echo "KEYMAP=es" > /mnt/etc/vconsole.conf
-
-              print_msg "Configurando hostname..."
-              echo "playnix-arch" > /mnt/etc/hostname
-              cat > /mnt/etc/hosts << EOF
-          127.0.0.1   localhost
-          ::1         localhost
-          127.0.1.1   playnix-arch.localdomain playnix-arch
-          EOF
-
-              print_msg "Configurando contraseña de root..."
-              arch-chroot /mnt bash -c "echo 'root:playnix' | chpasswd"
-
-              print_msg "Creando usuario playnix..."
-              arch-chroot /mnt useradd -m -G wheel,audio,video,storage,optical,network,power -s /bin/bash playnix
-              arch-chroot /mnt bash -c "echo 'playnix:playnix' | chpasswd"
-
-              print_msg "Configurando sudo..."
-              arch-chroot /mnt sed -i "s/# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/" /etc/sudoers
-
-              print_msg "Habilitando NetworkManager..."
-              arch-chroot /mnt systemctl enable NetworkManager.service
-          }
-
-          install_bootloader_auto() {
-              print_title "Instalando bootloader automáticamente"
-
-              if [ -d /sys/firmware/efi/efivars ]; then
-                  print_msg "Instalando GRUB para UEFI..."
-                  arch-chroot /mnt pacman -S --noconfirm efibootmgr
-                  arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=ARCH
-              else
-                  print_msg "Instalando GRUB para BIOS..."
-                  arch-chroot /mnt grub-install --target=i386-pc "$NVME_DISK"
-              fi
-
-              print_msg "Generando configuración de GRUB..."
-              arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg
-          }
-
-          configure_sddm_auto() {
-              print_title "Configurando SDDM para autologin"
-
-              print_msg "Configurando autologin para usuario playnix..."
-              mkdir -p /mnt/etc/sddm.conf.d
-              cat > /mnt/etc/sddm.conf.d/autologin.conf << EOF
-          [Autologin]
-          User=playnix
-          Session=plasma
-
-          [Theme]
-          Current=breeze
-
-          [General]
-          HaltCommand=/usr/bin/systemctl poweroff
-          RebootCommand=/usr/bin/systemctl reboot
-          EOF
-          }
-
-          cleanup_installation() {
-              print_msg "Limpiando instalación..."
-              arch-chroot /mnt pacman -Scc --noconfirm
-          }
-
-          main_auto() {
-              print_title "INSTALADOR AUTOMÁTICO DE ARCH LINUX + KDE"
-              print_msg "Instalación completamente automática iniciada..."
-              print_warning "Usuario: playnix | Contraseña: playnix"
-
-              check_root
-              check_internet
-
-              # Detectar disco NVMe
-              NVME_DISK=$(detect_nvme)
-
-              print_warning "SE INSTALARÁ EN: $NVME_DISK"
-              print_warning "TODOS LOS DATOS EN $NVME_DISK SERÁN ELIMINADOS"
-              echo ""
-              print_msg "La instalación comenzará en 10 segundos..."
-              print_msg "Presiona Ctrl+C para cancelar"
-              sleep 10
-
-              # Proceso automático
-              partition_disk_auto "$NVME_DISK"
-              format_partitions_auto
-              install_base_auto
-              install_kde_auto
-              configure_system_auto
-              install_bootloader_auto
-              configure_sddm_auto
-              cleanup_installation
-
-              # Finalizar
-              print_msg "Desmontando particiones..."
-              umount -R /mnt
-
-              print_title "¡INSTALACIÓN COMPLETADA!"
-              print_msg "Sistema instalado en: $NVME_DISK"
-              print_msg "Usuario: playnix"
-              print_msg "Contraseña: playnix"
-              print_msg "Entorno: KDE Plasma con autologin"
-              print_warning "Retira el USB e inicia desde el disco duro"
-
-              echo ""
-              read -p "¿Reiniciar ahora? (y/n): " reboot_choice
-              if [ "$reboot_choice" = "y" ] || [ "$reboot_choice" = "Y" ]; then
-                  print_msg "Reiniciando en 3 segundos..."
-                  sleep 3
-                  reboot
-              fi
-          }
-
-          show_help() {
-              echo "Instalador Automático de Arch Linux + KDE"
-              echo ""
-              echo "Opciones:"
-              echo "  auto     - Instalación 100% automática (por defecto)"
-              echo "  manual   - Abrir guía manual"
-              echo "  help     - Mostrar ayuda"
-              echo ""
-              echo "CONFIGURACIÓN AUTOMÁTICA:"
-              echo "  • Disco: Primer NVMe encontrado"
-              echo "  • Usuario: playnix"
-              echo "  • Contraseña: playnix"
-              echo "  • Entorno: KDE Plasma"
-              echo "  • Autologin: Habilitado"
-          }
-
-          # Ejecutar según parámetro
           case "${1:-auto}" in
-              "auto"|"install")
-                  main_auto
+              "auto"|"install"|"")
+                  main
                   ;;
               "manual")
                   firefox "https://wiki.archlinux.org/title/Installation_guide" &
                   ;;
-              "help"|"-h"|"--help")
-                  show_help
-                  ;;
               *)
-                  print_error "Opción desconocida: $1"
-                  show_help
-                  exit 1
+                  echo "Uso: arch-installer [auto|manual]"
                   ;;
           esac
           INSTALLEREOF
