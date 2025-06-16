@@ -11,12 +11,12 @@ mkdir -p /etc/sddm.conf.d
 sudo echo -e "[Autologin]\Relogin=true\User=playnix\n[Theme]\nCurrent=breeze" > $sddmConf
 
 #Dark Breeze theme
-kwriteconfig5 --file "$home/.config/kdeglobals" --group "KDE" --key "LookAndFeelPackage" "org.kde.breezedark.desktop"
+kwriteconfig5 --file "/home/playnix/.config/kdeglobals" --group "KDE" --key "LookAndFeelPackage" "org.kde.breezedark.desktop"
 
 #App launcher icon + Desktop BG
 icon_path="/etc/archinstall/icon.png"
 bg_path="/etc/archinstall/desktop.png"
-applet_file="$HOME/.config/plasma-org.kde.plasma.desktop-appletsrc"
+applet_file="/home/playnix/.config/plasma-org.kde.plasma.desktop-appletsrc"
 
 cp "$applet_file" "$applet_file.bak" || true
 
@@ -49,3 +49,8 @@ makepkg -si --noconfirm
 
 cd /
 rm -rf /tmp/yay
+
+#Desktop shortcuts
+mkdir -p "/home/playnix/Desktop"
+cp /etc/archinstall/*.desktop /home/playnix/Desktop/
+chmod +x /home/playnix/Desktop/*.desktop
