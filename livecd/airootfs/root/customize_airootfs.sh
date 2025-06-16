@@ -62,3 +62,17 @@ fi
 
 # Clean pacman cache
 pacman -Scc --noconfirm || true
+
+# yay
+cd /tmp
+git clone https://aur.archlinux.org/yay.git
+cd yay
+
+makepkg -si --noconfirm
+
+cd /
+rm -rf /tmp/yay
+
+#Plymouth Sweet Arch
+yay -S plymouth-theme-sweet-arch-git
+plymouth-set-default-theme -R sweet-arch
