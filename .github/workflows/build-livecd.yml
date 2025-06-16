@@ -44,7 +44,6 @@ jobs:
           chmod +x airootfs/usr/local/bin/arch-installer
           chmod +x airootfs/usr/local/bin/livecd-loading
           chmod +x airootfs/root/customize_airootfs.sh
-          chmod +x /etc/archinstall/post_install.sh
           '
 
       - name: Build ISO
