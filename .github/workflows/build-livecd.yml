@@ -564,31 +564,7 @@ jobs:
           tag_name: v${{ github.run_number }}
           name: Arch Linux KDE Live CD v${{ github.run_number }}
           body: |
-            # 🐧 Arch Linux Live CD con KDE Plasma
-
-            ## ✨ Características:
-            - **Entorno**: KDE Plasma completo
-            - **Usuario**: `liveuser` (sin contraseña, autologin)
-            - **Red**: NetworkManager habilitado
-            - **Instalador**: Script guiado incluido
-
-            ## 📦 Aplicaciones:
-            - Firefox, Konsole, Dolphin, Kate
-            - GParted, Instalador de Arch Linux
-            - Spectacle, Okular, Gwenview, VLC
-
-            ## 💻 Requisitos:
-            - **RAM**: 2GB mín, 4GB recomendado
-            - **Arch**: x86_64
-            - **Boot**: UEFI/BIOS compatible
-
-            ## 🚀 Uso:
-            1. Descarga la ISO
-            2. Graba en USB con Rufus/Etcher
-            3. Arranca desde USB
-            4. Usa "Instalador de Arch Linux" del escritorio
-
-            **Tamaño**: ~2.5GB
+            # 🐧 Arch Linux KDE Live CD
           files: iso-output/*.iso
           draft: false
           prerelease: false
