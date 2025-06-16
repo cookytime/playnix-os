@@ -27,16 +27,16 @@ for service in NetworkManager sddm livecd-loading; do
     echo "Service ${service} not found, skipping enable."
   fi
 done
-
-# SDDM autologin configuration
-mkdir -p /etc/sddm.conf.d
-cat > /etc/sddm.conf.d/autologin.conf << EOF
-[Autologin]
-User=liveuser
-Session=plasma
-[Theme]
-Current=breeze
-EOF
+#
+# # SDDM autologin configuration
+# mkdir -p /etc/sddm.conf.d
+# cat > /etc/sddm.conf.d/autologin.conf << EOF
+# [Autologin]
+# User=liveuser
+# Session=plasma
+# [Theme]
+# Current=breeze
+# EOF
 
 # Hostname
 echo "archiso-kde" > /etc/hostname
