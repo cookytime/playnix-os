@@ -116,12 +116,12 @@ jobs:
           echo "=== Archivos del proyecto ==="
           ls -la
           echo "=== Construyendo ISO con pantalla de carga ==="
-          mkarchiso -v -w work -o out .
+          mkarchiso -v -w /work -o /out .
           echo "=== Archivos del proyecto post mkarchiso ==="
-          ls -la
+          ls -la /
           '
           mkdir -p iso-output
-          docker cp arch-builder:/build/archiso-kde/out/. ./iso-output/
+          docker cp arch-builder:/out/. ./iso-output/
           ls -lh ./iso-output/
 
       - name: Cleanup
