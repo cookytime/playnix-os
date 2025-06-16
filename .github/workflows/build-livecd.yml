@@ -44,7 +44,24 @@ jobs:
           # Copiar todos los archivos del repositorio livecd
           if [ -d /host-workspace/livecd ]; then
             echo "📁 Copiando configuración desde repositorio..."
-            cp -r /host-workspace/livecd/* . 2>/dev/null || true
+
+            # Copiar archivos principales
+            cp /host-workspace/livecd/packages.x86_64 . 2>/dev/null || { echo "❌ packages.x86_64 no encontrado"; exit 1; }
+            cp /host-workspace/livecd/pacman.conf . 2>/dev/null || { echo "❌ pacman.conf no encontrado"; exit 1; }
+            cp /host-workspace/livecd/profiledef.sh . 2>/dev/null || { echo "❌ profiledef.sh no encontrado"; exit 1; }
+
+            # Crear estructura airootfs y copiar customize_airootfs.sh
+            mkdir -p airootfs/root
+            cp /host-workspace/livecd/customize_airootfs.sh airootfs/root/ 2>/dev/null || { echo "❌ customize_airootfs.sh no encontrado"; exit 1; }
+            chmod +x airootfs/root/customize_airootfs.sh
+
+            # Copiar configuración de boot si existe
+            if [ -d /host-workspace/livecd/boot ]; then
+              echo "🥾 Copiando configuración de boot..."
+              cp -r /host-workspace/livecd/boot/* . 2>/dev/null || true
+            fi
+
+            echo "✅ Archivos copiados correctamente"
             ls -la
           else
             echo "❌ Directorio livecd no encontrado"
@@ -90,8 +107,7 @@ jobs:
           docker exec arch-builder bash -c '
           cd /build/archiso-kde
 
-          # Los archivos ya se copiaron en el paso anterior
-          # Solo verificar que existen los archivos necesarios
+          # Verificar que los archivos ya están copiados correctamente
           echo "✅ Verificando archivos de configuración..."
 
           if [ ! -f pacman.conf ]; then
@@ -100,14 +116,24 @@ jobs:
           fi
 
           if [ ! -f airootfs/root/customize_airootfs.sh ]; then
-            echo "❌ customize_airootfs.sh no encontrado"
+            echo "❌ customize_airootfs.sh no encontrado en airootfs/root/"
             exit 1
           fi
 
-          # Hacer ejecutable el script de customización
-          chmod +x airootfs/root/customize_airootfs.sh
+          if [ ! -f profiledef.sh ]; then
+            echo "❌ profiledef.sh no encontrado"
+            exit 1
+          fi
+
+          if [ ! -f packages.x86_64 ]; then
+            echo "❌ packages.x86_64 no encontrado"
+            exit 1
+          fi
 
           echo "✅ Todos los archivos de configuración están listos"
+          echo "📋 Archivos encontrados:"
+          ls -la packages.x86_64 pacman.conf profiledef.sh
+          ls -la airootfs/root/customize_airootfs.sh
           '
 
       - name: Setup boot configuration
@@ -115,29 +141,26 @@ jobs:
           docker exec arch-builder bash -c '
           cd /build/archiso-kde
 
-          # Los archivos de boot ya se copiaron, solo verificar profiledef.sh
-          if [ ! -f profiledef.sh ]; then
-            echo "❌ profiledef.sh no encontrado, creando por defecto..."
-            cat > profiledef.sh << "PROFILEEOF"
-          #!/usr/bin/env bash
-          iso_name="playnix-arch-kde"
-          iso_label="PLAYNIX_$(date +%Y%m)"
-          iso_publisher="PlayNix Arch Linux KDE"
-          iso_application="PlayNix Arch Linux KDE Live CD"
-          iso_version="$(date +%Y.%m.%d)"
-          install_dir="arch"
-          buildmodes=("iso")
-          bootmodes=("bios.syslinux.mbr" "bios.syslinux.eltorito" "uefi-x64.systemd-boot.esp" "uefi-x64.systemd-boot.eltorito")
-          arch="x86_64"
-          pacman_conf="pacman.conf"
-          airootfs_image_type="squashfs"
-          airootfs_image_tool_options=("-comp" "xz" "-b" "1M")
-          file_permissions=(
-            ["/root"]="0:0:750"
-            ["/root/customize_airootfs.sh"]="0:0:755"
-            ["/usr/local/bin/arch-installer"]="0:0:755"
-          )
-          PROFILEEOF
+          # Verificar que profiledef.sh existe (ya se copió)
+          if [ -f profiledef.sh ]; then
+            echo "✅ profiledef.sh encontrado"
+          else
+            echo "❌ profiledef.sh no encontrado"
+            exit 1
+          fi
+
+          # Verificar configuración de boot
+          echo "🥾 Verificando configuración de boot..."
+          if [ -f grub/grub.cfg ]; then
+            echo "✅ GRUB configurado"
+          fi
+
+          if [ -f efiboot/loader/loader.conf ]; then
+            echo "✅ SystemD-Boot configurado"
+          fi
+
+          if [ -f syslinux/archiso_sys-linux.cfg ]; then
+            echo "✅ SYSLINUX configurado"
           fi
 
           echo "✅ Configuración de boot verificada"
