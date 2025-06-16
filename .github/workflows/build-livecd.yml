@@ -171,6 +171,11 @@ jobs:
 
       - name: Create archinstall configuration
         run: |
+
+          DEVICE="/dev/nvme0n1"
+          TOTAL_SIZE=$(sudo blockdev --getsize64 $DEVICE)
+          AVAILABLE_GIB=$(( (TOTAL_SIZE / 1073741824) - 2 ))
+
           docker exec arch-builder bash -c '
           cd /build/archiso-kde
           mkdir -p airootfs/usr/local/bin
@@ -234,8 +239,8 @@ jobs:
                           "unit": "B",
                           "value": 512
                         },
-                        "unit": "%",
-                        "value": "100%FREE"
+                        "unit": "GiB",
+                        "value": $AVAILABLE_GIB
                       },
                       "start": {
                         "sector_size": {
