@@ -21,14 +21,14 @@
             "fs_type": "fat32",
             "mount_options": [],
             "mountpoint": "/boot",
-            "obj_id": "9302cd00-7e28-4c67-a0a7-3526ead7174a",
+            "obj_id": "592c23ff-1230-495d-aea9-c6af6ef3de13",
             "size": {
               "sector_size": {
                 "unit": "B",
                 "value": 512
               },
-              "unit": "MiB",
-              "value": 512
+              "unit": "GiB",
+              "value": 1
             },
             "start": {
               "sector_size": {
@@ -45,52 +45,25 @@
             "btrfs": [],
             "dev_path": null,
             "flags": [],
-            "fs_type": "swap",
-            "mount_options": [],
-            "mountpoint": null,
-            "obj_id": "swap-partition-id",
-            "size": {
-              "sector_size": {
-                "unit": "B",
-                "value": 512
-              },
-              "unit": "GiB",
-              "value": 4
-            },
-            "start": {
-              "sector_size": {
-                "unit": "B",
-                "value": 512
-              },
-              "unit": "MiB",
-              "value": 513
-            },
-            "status": "create",
-            "type": "primary"
-          },
-          {
-            "btrfs": [],
-            "dev_path": null,
-            "flags": [],
             "fs_type": "ext4",
             "mount_options": [],
             "mountpoint": "/",
-            "obj_id": "b1b0fecf-9863-41c8-ad98-54e0cd26abc0",
+            "obj_id": "659fd4df-7b61-4df2-923c-f6aba8ba66a1",
             "size": {
               "sector_size": {
                 "unit": "B",
                 "value": 512
               },
-              "unit": "%",
-              "value": "100%FREE"
+              "unit": "B",
+              "value": 1999323004928
             },
             "start": {
               "sector_size": {
                 "unit": "B",
                 "value": 512
               },
-              "unit": "GiB",
-              "value": 4.5
+              "unit": "B",
+              "value": 1074790400
             },
             "status": "create",
             "type": "primary"
@@ -100,10 +73,10 @@
       }
     ]
   },
-  "hostname": "playnix",
+  "hostname": "archlinux",
   "kernels": ["linux"],
   "locale_config": {
-    "kb_layout": "us",
+    "kb_layout": "es",
     "sys_enc": "UTF-8",
     "sys_lang": "en_US.UTF-8"
   },
@@ -237,7 +210,6 @@
         "https://mirror.hasphetica.win/archlinux/$repo/os/$arch",
         "https://arch.mirror.marcusspencer.us:4443/archlinux/$repo/os/$arch",
         "https://us-mnz.soulharsh007.dev/archlinux/$repo/os/$arch",
-        "https://mirror.akane.network/archmirror/$repo/os/$arch",
         "http://arch.miningtcup.me/$repo/os/$arch",
         "https://arch.miningtcup.me/$repo/os/$arch",
         "http://mirrors.smeal.xyz/arch-linux/$repo/os/$arch",
@@ -258,7 +230,7 @@
   "packages": ["base-devel", "curl", "firefox", "git", "nano", "plymouth", "gwenview"],
   "parallel_downloads": 0,
   "profile_config": {
-    "gfx_driver": "All open-source",
+    "gfx_driver": "AMD / ATI (open-source)",
     "greeter": "sddm",
     "profile": {
       "custom_settings": {
