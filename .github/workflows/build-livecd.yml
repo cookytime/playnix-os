@@ -117,7 +117,8 @@ jobs:
           ls -la
           echo "=== Construyendo ISO con pantalla de carga ==="
           mkarchiso -v -w work -o out .
-          ls -la out/
+          echo "=== Archivos del proyecto post mkarchiso ==="
+          ls -la
           '
           mkdir -p iso-output
           docker cp arch-builder:/build/archiso-kde/out/. ./iso-output/
