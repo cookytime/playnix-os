@@ -85,7 +85,6 @@ kinfocenter
 systemsettings
 plasma-workspace-wallpapers
 bluedevil
-khotkeys
 kmenuedit
 kwrited
 
@@ -119,7 +118,6 @@ gst-libav
 htop
 btop
 fastfetch
-neofetch
 git
 vim
 nano
@@ -175,8 +173,6 @@ gcc
 gdb
 
 # Text editors
-vim
-nano
 gedit
 
 # File managers
@@ -187,15 +183,9 @@ ranger
 iotop
 nload
 nethogs
-dstat
 
 # Disk utilities
 ncdu
-df
-du
-lsblk
-fdisk
-gdisk
 
 # Additional utilities
 man-db
@@ -205,14 +195,10 @@ zsh
 zsh-completions
 fish
 dialog
-whiptail
 bc
 calc
 less
-more
 grep
 sed
 awk
-find
-locate
 mlocate

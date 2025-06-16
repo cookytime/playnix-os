@@ -28,8 +28,25 @@ jobs:
             archlinux:latest sleep infinity
 
           # Actualizar sistema y instalar dependencias
-          docker exec arch-builder pacman -Syu --noconfirm
-          docker exec arch-builder pacman -S --noconfirm archiso git base-devel wget
+          echo "🔄 Actualizando sistema base..."
+          docker exec arch-builder bash -c '
+          # Actualizar mirrors primero
+          echo "Server = https://mirror.rackspace.com/archlinux/\$repo/os/\$arch" > /etc/pacman.d/mirrorlist
+          echo "Server = https://mirrors.kernel.org/archlinux/\$repo/os/\$arch" >> /etc/pacman.d/mirrorlist
+          echo "Server = https://mirror.leaseweb.net/archlinux/\$repo/os/\$arch" >> /etc/pacman.d/mirrorlist
+
+          # Inicializar keyring
+          pacman-key --init
+          pacman-key --populate archlinux
+
+          # Actualizar sistema
+          pacman -Syu --noconfirm
+
+          # Instalar dependencias necesarias
+          pacman -S --noconfirm archiso git base-devel wget reflector
+
+          echo "✅ Sistema preparado correctamente"
+          '
 
       - name: Create archiso profile
         run: |
@@ -170,18 +187,82 @@ jobs:
         run: |
           docker exec arch-builder bash -c '
           cd /build/archiso-kde
-          echo "=== Estructura del proyecto ==="
-          find . -type f -name "*.sh" -o -name "*.conf" -o -name "*.cfg" -o -name "packages.x86_64" | head -20
+          echo "=== Verificando estructura del proyecto antes del build ==="
+          echo "📁 Archivos principales:"
+          ls -la packages.x86_64 pacman.conf profiledef.sh 2>/dev/null || echo "❌ Faltan archivos principales"
           echo ""
-          echo "=== Construyendo ISO ==="
-          mkarchiso -v -w work -o out .
+          echo "🔧 Script de customización:"
+          ls -la airootfs/root/customize_airootfs.sh 2>/dev/null || echo "❌ customize_airootfs.sh no encontrado"
           echo ""
-          echo "=== ISO generada ==="
-          ls -la out/
+          echo "🛠️ Instalador:"
+          ls -la airootfs/usr/local/bin/arch-installer 2>/dev/null || echo "❌ arch-installer no encontrado"
+          echo ""
+          echo "🥾 Configuración de boot:"
+          ls -la grub/ efiboot/ syslinux/ 2>/dev/null || echo "ℹ️ Usando configuración de boot por defecto"
+          echo ""
+
+          # Verificar contenido de packages.x86_64
+          echo "📦 Primeros paquetes en la lista:"
+          head -20 packages.x86_64
+          echo ""
+
+          # Crear directorios necesarios
+          mkdir -p work out
+
+          echo "🚀 Iniciando construcción de la ISO..."
+          echo "⏰ Esto puede tomar 15-20 minutos..."
+
+          # Ejecutar mkarchiso con manejo de errores mejorado
+          if mkarchiso -v -w work -o out . ; then
+            echo ""
+            echo "✅ ¡ISO construida exitosamente!"
+            echo "📁 Archivos generados:"
+            ls -lh out/
+          else
+            echo ""
+            echo "❌ Error en la construcción de la ISO"
+            echo "📋 Verificando logs..."
+
+            # Mostrar información de debug
+            echo "=== INFORMACIÓN DE DEBUG ==="
+            echo "📁 Contenido del directorio actual:"
+            ls -la
+            echo ""
+            echo "📁 Contenido del directorio work:"
+            ls -la work/ 2>/dev/null || echo "Directorio work no existe"
+            echo ""
+            echo "📁 Contenido del directorio out:"
+            ls -la out/ 2>/dev/null || echo "Directorio out no existe o está vacío"
+            echo ""
+            echo "💾 Espacio en disco:"
+            df -h
+            echo ""
+            echo "🧠 Memoria disponible:"
+            free -h
+            echo ""
+            echo "📄 Últimas líneas del log del sistema:"
+            tail -20 /var/log/pacman.log 2>/dev/null || echo "Log de pacman no disponible"
+
+            exit 1
+          fi
           '
-          mkdir -p iso-output
-          docker cp arch-builder:/build/archiso-kde/out/. ./iso-output/
-          ls -lh ./iso-output/
+
+          # Solo continuar si el build fue exitoso
+          if [ $? -eq 0 ]; then
+            # Crear directorio de salida en el host
+            mkdir -p iso-output
+
+            # Copiar ISO al workspace del host
+            echo "📥 Copiando ISO al host..."
+            docker cp arch-builder:/build/archiso-kde/out/. ./iso-output/
+
+            # Mostrar información del ISO generado
+            echo "🎉 ISO lista:"
+            ls -lh ./iso-output/
+          else
+            echo "❌ El build falló, no se puede continuar"
+            exit 1
+          fi
 
       - name: Cleanup
         if: always()
