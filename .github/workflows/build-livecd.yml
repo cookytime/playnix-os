@@ -34,91 +34,23 @@ jobs:
       - name: Create archiso profile
         run: |
           docker exec arch-builder bash -c '
-          pwd
-          ls -la
           cd /build/archiso-kde
-          ls -la
-          cp -r /usr/share/archiso/configs/releng/* . '
-
-      - name: Create archinstall configuration
-        run: |
-          docker exec arch-builder bash -c '
-          cd /build/archiso-kde
-          pwd
-          ls -la
-          chmod +x ./airootfs/usr/local/bin/arch-installer
-          '
-
-      - name: Configure desktop entries
-        run: |
-          docker exec arch-builder bash -c '
-          cd /build/archiso-kde
-          mkdir -p airootfs/etc/skel/Desktop
+          cp -r /usr/share/archiso/configs/releng/* .
+          chmod +x airootfs/usr/local/bin/arch-installer
           mkdir -p airootfs/root/Desktop
-
           chmod +x ./airootfs/etc/skel/Desktop/*.desktop
           cp airootfs/etc/skel/Desktop/*.desktop airootfs/root/Desktop/
           chmod +x ./airootfs/root/Desktop/*.desktop
-          '
-
-      - name: Create pacman.conf
-        run: |
-          docker exec arch-builder bash -c '
-          cd /build/archiso-kde'
-
-      - name: Create loading screen service
-        run: |
-          docker exec arch-builder bash -c '
-          cd /build/archiso-kde
-          mkdir -p airootfs/etc/systemd/system
-          mkdir -p airootfs/usr/local/bin
-
-          # Crear script de loading screen
+          chmod +x airootfs/usr/local/bin/arch-installer
           chmod +x airootfs/usr/local/bin/livecd-loading
-          '
-
-      - name: Configure system customization
-        run: |
-          docker exec arch-builder bash -c '
-          cd /build/archiso-kde
-          mkdir -p airootfs/etc/skel/.config
-          mkdir -p airootfs/etc/systemd/system
-          mkdir -p airootfs/etc/sddm.conf.d
-
           chmod +x airootfs/root/customize_airootfs.sh
-          '
-
-      - name: Configure boot with loading screen
-        run: |
-          docker exec arch-builder bash -c '
-          cd /build/archiso-kde'
-
-      - name: Configure mkinitcpio for Plymouth
-        run: |
-          docker exec arch-builder bash -c '
-          cd /build/archiso-kde
-          mkdir -p airootfs/etc
-          '
-
-      - name: Add boot message customization
-        run: |
-          docker exec arch-builder bash -c '
-          cd /build/archiso-kde
-          mkdir -p airootfs/etc/systemd/system/getty@tty1.service.d
-
-          # Personalizar getty para mostrar mensaje de bienvenida
           '
 
       - name: Build ISO
         run: |
           docker exec arch-builder bash -c '
           cd /build/archiso-kde
-          echo "=== Archivos del proyecto ==="
-          ls -la
-          echo "=== Construyendo ISO con pantalla de carga ==="
           mkarchiso -v -w work -o out .
-          echo "=== Archivos del proyecto post mkarchiso ==="
-          ls -la
           '
           mkdir -p iso-output
           docker cp arch-builder:/build/archiso-kde/out/. ./iso-output/
