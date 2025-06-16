@@ -36,7 +36,7 @@ jobs:
           docker exec arch-builder bash -c '
           cd /build/archiso-kde
           mkdir -p airootfs/root/Desktop
-          cp -r /usr/share/archiso/configs/releng/* .
+          rsync -a --ignore-existing /usr/share/archiso/configs/releng/ ./
           cp airootfs/etc/skel/Desktop/*.desktop airootfs/root/Desktop/
           chmod +x airootfs/usr/local/bin/arch-installer
           chmod +x airootfs/etc/skel/Desktop/*.desktop
