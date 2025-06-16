@@ -220,7 +220,7 @@ jobs:
 
           # Ejecutar mkarchiso con mejor captura de errores
           set -o pipefail
-          if mkarchiso -v -w work -o out . 2>&1 | tee build.log ; then
+          if mkarchiso -w work -o out . 2>&1 | tee build.log ; then
             echo ""
             echo "✅ ¡ISO construida exitosamente!"
             echo "📁 Archivos generados:"

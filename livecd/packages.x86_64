@@ -1,4 +1,4 @@
-# PlayNix Arch Linux KDE Live CD - Package List (Simplificada para evitar errores)
+# PlayNix Arch Linux KDE Live CD - Package List (Con dependencias NBD)
 
 # Base system - OBLIGATORIO
 base
@@ -9,6 +9,9 @@ mkinitcpio
 mkinitcpio-archiso
 mkinitcpio-nfs-utils
 archiso
+
+# NBD support - REQUERIDO por archiso
+nbd
 
 # Boot - OBLIGATORIO
 syslinux
