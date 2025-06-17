@@ -72,16 +72,15 @@ chmod -R 700 /etc/pacman.d/gnupg
 
 sed -i '/Worldwide/ {n;s/^#Server/Server/}' /etc/pacman.d/mirrorlist
 
-# yay
-cd /tmp
-git clone https://aur.archlinux.org/yay.git
-cd yay
+# yay + Plymouth Sweet Arch
+su - liveuser -c '
+  cd /tmp
+  git clone https://aur.archlinux.org/yay.git
+  cd yay
+  makepkg -si --noconfirm
+  cd /
+  rm -rf /tmp/yay
+  yay -S --noconfirm plymouth-theme-sweet-arch-git
+'
 
-makepkg -si --noconfirm
-
-cd /
-rm -rf /tmp/yay
-
-#Plymouth Sweet Arch
-yay -S plymouth-theme-sweet-arch-git
 plymouth-set-default-theme -R sweet-arch
