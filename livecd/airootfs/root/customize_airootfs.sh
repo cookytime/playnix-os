@@ -71,25 +71,3 @@ chown -R root:root /etc/pacman.d/gnupg
 chmod -R 700 /etc/pacman.d/gnupg
 
 sed -i '/Worldwide/ {n;s/^#Server/Server/}' /etc/pacman.d/mirrorlist
-
-# Limpiar antes
-pacman -Scc --noconfirm
-rm -rf /var/cache/pacman/pkg/*
-rm -rf /tmp/*
-
-# Comprobar espacio libre
-df -h /
-
-# yay + Plymouth Sweet Arch
-su - liveuser -c '
-  cd /tmp
-  git clone https://aur.archlinux.org/yay.git
-  cd yay
-  makepkg -si --noconfirm
-  cd /
-  rm -rf /tmp/yay
-  yay -S --noconfirm plymouth-theme-sweet-arch-git
-'
-
-plymouth-set-default-theme -R sweet-arch
-
