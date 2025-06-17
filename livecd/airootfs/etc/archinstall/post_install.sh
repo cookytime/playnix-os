@@ -41,20 +41,17 @@ fi
 chown "playnix:playnix" "$applet_file"
 
 # yay
-cd /tmp
-git clone https://aur.archlinux.org/yay.git
-cd yay
+su - playnix -c '
+  cd /tmp
+  git clone https://aur.archlinux.org/yay.git
+  cd yay
+  makepkg -si --noconfirm
+  cd /
+  rm -rf /tmp/yay
+  yay -S --noconfirm plymouth-theme-sweet-arch-git
+'
 
-makepkg -si --noconfirm
-
-cd /
-rm -rf /tmp/yay
-
-#Plymouth Sweet Arch
-yay -S plymouth-theme-sweet-arch-git
 plymouth-set-default-theme -R sweet-arch
-
-
 
 #Desktop shortcuts
 mkdir -p "/home/playnix/Desktop"
