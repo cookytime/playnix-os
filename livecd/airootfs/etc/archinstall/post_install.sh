@@ -10,6 +10,7 @@ APPLET_FILE="$HOME/.config/plasma-org.kde.plasma.desktop-appletsrc"
 
 # Breeze login theme
 mkdir -p /etc/sddm.conf.d
+touch "$SDDM_CONF"
 cat > "$SDDM_CONF" <<EOF
 [Autologin]
 Relogin=true
@@ -19,7 +20,9 @@ Current=breeze
 EOF
 
 # Dark Breeze theme
-runuser -u "$USER" -- kwriteconfig5 --file "$HOME/.config/kdeglobals" --group "KDE" --key "LookAndFeelPackage" "org.kde.breezedark.desktop" || true
+
+echo "[KDE]" >> "$HOME/.config/kdeglobals"
+echo "LookAndFeelPackage=org.kde.breezedark.desktop" >> "$HOME/.config/kdeglobals"
 
 # App launcher icon + Desktop BG
 if [ -f "$APPLET_FILE" ]; then
@@ -43,6 +46,8 @@ else
   echo "No applet file found; skipping desktop customization."
 fi
 
+echo "$USER ALL=(ALL) NOPASSWD: /usr/bin/pacman" >> /etc/sudoers.d/99-pacman-nopasswd
+
 # yay (requiere tener go, git y base-devel instalados)
 su - "$USER" -c '
   cd /tmp
@@ -53,6 +58,8 @@ su - "$USER" -c '
   rm -rf /tmp/yay
   yay -S --noconfirm plymouth-theme-sweet-arch-git || true
 '
+
+rm -rf /etc/sudoers.d/99-pacman-nopasswd
 
 plymouth-set-default-theme -R sweet-arch || true
 

@@ -7,4 +7,18 @@ AVAILABLE_GIB=$(( (TOTAL_SIZE / 1073741824) - 2 ))
 sudo sed -i "s/99999999/$AVAILABLE_GIB/" /etc/archinstall/user_configuration.json
 
 # PlayNix Arch Linux Installer - Usando archinstall oficial
-sudo archinstall --config /etc/archinstall/user_configuration.json --creds /etc/archinstall/user_credentials.json --silent
+sudo archinstall --config /etc/archinstall/user_configuration.json --creds /etc/archinstall/user_credentials.json --silent &
+wait $!
+
+# Dark Breeze theme
+
+mount --types proc /proc /mnt/proc
+mount --rbind /sys /mnt/sys
+mount --rbind /dev /mnt/dev
+mount --make-rslave /mnt/sys
+mount --make-rslave /mnt/dev
+
+mkdir -p /mnt/etc/archinstall/
+cp /etc/archinstall/* /mnt/etc/archinstall/
+chmod +x /mnt/etc/archinstall/post_install.sh
+arch-chroot /mnt /etc/archinstall/post_install.sh
