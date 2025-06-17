@@ -1,59 +1,67 @@
 #!/usr/bin/env bash
+set -euxo pipefail
 
-sddmConf="/usr/lib/sddm/sddm.conf.d/default.conf"
+USER="playnix"
+HOME="/home/$USER"
+SDDM_CONF="/etc/sddm.conf.d/autologin.conf"
+ICON_PATH="/etc/archinstall/icon.png"
+BG_PATH="/etc/archinstall/desktop.png"
+APPLET_FILE="$HOME/.config/plasma-org.kde.plasma.desktop-appletsrc"
 
-if [ -f /etc/sddm.conf.d/kde_settings.conf ]; then
-    sddmConf="/etc/sddm.conf.d/kde_settings.conf"
-fi
-
-#Breeze login theme
+# Breeze login theme
 mkdir -p /etc/sddm.conf.d
-sudo echo -e "[Autologin]\Relogin=true\User=playnix\n[Theme]\nCurrent=breeze" > $sddmConf
+cat > "$SDDM_CONF" <<EOF
+[Autologin]
+Relogin=true
+User=$USER
+[Theme]
+Current=breeze
+EOF
 
-#Dark Breeze theme
-kwriteconfig5 --file "/home/playnix/.config/kdeglobals" --group "KDE" --key "LookAndFeelPackage" "org.kde.breezedark.desktop"
+# Dark Breeze theme
+runuser -u "$USER" -- kwriteconfig5 --file "$HOME/.config/kdeglobals" --group "KDE" --key "LookAndFeelPackage" "org.kde.breezedark.desktop" || true
 
-#App launcher icon + Desktop BG
-icon_path="/etc/archinstall/icon.png"
-bg_path="/etc/archinstall/desktop.png"
-applet_file="/home/playnix/.config/plasma-org.kde.plasma.desktop-appletsrc"
-
-cp "$applet_file" "$applet_file.bak" || true
-
-sed -i "/plugin=org.kde.plasma.kickoff/,/^\[/{s|^icon=.*$|icon=$icon_path|}" "$applet_file"
-sed -i "/plugin=org.kde.plasma.kicker/,/^\[/{s|^icon=.*$|icon=$icon_path|}" "$applet_file"
-
-if ! grep -q "icon=" "$applet_file"; then
-    sed -i "/plugin=org.kde.plasma.kickoff/a icon=$icon_path" "$applet_file"
-    sed -i "/plugin=org.kde.plasma.kicker/a icon=$icon_path" "$applet_file"
-fi
-
-containment_id=$(awk -F'[][]' '/\[Containments\][0-9]+\]/{id=$2} /\[Containments\][0-9]+\]\[Wallpaper\]/,/\[/{if($0~"plugin=org.kde.image"){print id; exit}}' "$applet_file")
-
-if [ -n "$containment_id" ]; then
-  sed -i "/\\[Containments\\]\\[$containment_id\\]\\[Wallpaper\\]\\[org.kde.image\\]\\[General\\]/,/^\\[/ s|^Image=.*$|Image=file://$bg_path|" "$applet_file"
-  grep -q "Image=file://$bg_path" "$applet_file" || \
-    sed -i "/\\[Containments\\]\\[$containment_id\\]\\[Wallpaper\\]\\[org.kde.image\\]\\[General\\]/ a Image=file://$bg_path" "$applet_file"
+# App launcher icon + Desktop BG
+if [ -f "$APPLET_FILE" ]; then
+  cp "$APPLET_FILE" "$APPLET_FILE.bak" || true
+  sed -i "/plugin=org.kde.plasma.kickoff/,/^\[/{s|^icon=.*$|icon=$ICON_PATH|}" "$APPLET_FILE"
+  sed -i "/plugin=org.kde.plasma.kicker/,/^\[/{s|^icon=.*$|icon=$ICON_PATH|}" "$APPLET_FILE"
+  if ! grep -q "icon=" "$APPLET_FILE"; then
+      sed -i "/plugin=org.kde.plasma.kickoff/a icon=$ICON_PATH" "$APPLET_FILE"
+      sed -i "/plugin=org.kde.plasma.kicker/a icon=$ICON_PATH" "$APPLET_FILE"
+  fi
+  CONTAINMENT_ID=$(awk -F'[][]' '/\[Containments\][0-9]+\]/{id=$2} /\[Containments\][0-9]+\]\[Wallpaper\]/,/\[/{if($0~"plugin=org.kde.image"){print id; exit}}' "$APPLET_FILE")
+  if [ -n "$CONTAINMENT_ID" ]; then
+    sed -i "/\\[Containments\\]\\[$CONTAINMENT_ID\\]\\[Wallpaper\\]\\[org.kde.image\\]\\[General\\]/,/^\\[/ s|^Image=.*$|Image=file://$BG_PATH|" "$APPLET_FILE"
+    grep -q "Image=file://$BG_PATH" "$APPLET_FILE" || \
+      sed -i "/\\[Containments\\]\\[$CONTAINMENT_ID\\]\\[Wallpaper\\]\\[org.kde.image\\]\\[General\\]/ a Image=file://$BG_PATH" "$APPLET_FILE"
+  else
+    echo "No desktop containment found; wallpaper not set."
+  fi
+  chown "$USER:$USER" "$APPLET_FILE"
 else
-  echo "No desktop containment found; wallpaper not set."
+  echo "No applet file found; skipping desktop customization."
 fi
 
-chown "playnix:playnix" "$applet_file"
-
-# yay
-su - playnix -c '
+# yay (requiere tener go, git y base-devel instalados)
+su - "$USER" -c '
   cd /tmp
   git clone https://aur.archlinux.org/yay.git
   cd yay
-  makepkg -si --noconfirm
+  makepkg -si --noconfirm || true
   cd /
   rm -rf /tmp/yay
-  yay -S --noconfirm plymouth-theme-sweet-arch-git
+  yay -S --noconfirm plymouth-theme-sweet-arch-git || true
 '
 
-plymouth-set-default-theme -R sweet-arch
+plymouth-set-default-theme -R sweet-arch || true
 
-#Desktop shortcuts
-mkdir -p "/home/playnix/Desktop"
-cp /etc/archinstall/*.desktop /home/playnix/Desktop/
-chmod +x /home/playnix/Desktop/*.desktop
+# Desktop shortcuts
+mkdir -p "$HOME/Desktop"
+cp /etc/archinstall/*.desktop "$HOME/Desktop/" || true
+chmod +x "$HOME/Desktop/"*.desktop || true
+
+# Permisos finales
+chown -R "$USER:$USER" "$HOME"
+
+exit 0
