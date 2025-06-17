@@ -8,20 +8,3 @@ sudo sed -i "s/99999999/$AVAILABLE_GIB/" /etc/archinstall/user_configuration.jso
 
 # PlayNix Arch Linux Installer - Usando archinstall oficial
 sudo archinstall --config /etc/archinstall/user_configuration.json --creds /etc/archinstall/user_credentials.json --silent
-
-
-cp /etc/archinstall/post_install.sh /mnt/root/
-chmod +x /mnt/root/post_install.sh
-mkdir -p /mnt/etc/archinstall
-cp /etc/archinstall/* /mnt/etc/archinstall/
-
-
-mount --types proc /proc /mnt/proc
-mount --rbind /sys /mnt/sys
-mount --rbind /dev /mnt/dev
-
-
-arch-chroot /mnt /root/post_install.sh
-
-
-rm /mnt/root/post_install.sh

@@ -244,5 +244,5 @@
   "swap": true,
   "timezone": "UTC",
   "version": null,
-  "post_install": ["bash /etc/archinstall/post_install.sh"]
+  "post_setup": ["/etc/archinstall/post_install.sh"]
 }
