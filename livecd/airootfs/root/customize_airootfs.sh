@@ -72,6 +72,14 @@ chmod -R 700 /etc/pacman.d/gnupg
 
 sed -i '/Worldwide/ {n;s/^#Server/Server/}' /etc/pacman.d/mirrorlist
 
+# Limpiar antes
+pacman -Scc --noconfirm
+rm -rf /var/cache/pacman/pkg/*
+rm -rf /tmp/*
+
+# Comprobar espacio libre
+df -h /
+
 # yay + Plymouth Sweet Arch
 su - liveuser -c '
   cd /tmp
@@ -84,3 +92,4 @@ su - liveuser -c '
 '
 
 plymouth-set-default-theme -R sweet-arch
+
