@@ -20,31 +20,8 @@ Current=breeze
 EOF
 
 # Dark Breeze theme
-
 echo "[KDE]" >> "$HOME/.config/kdeglobals"
 echo "LookAndFeelPackage=org.kde.breezedark.desktop" >> "$HOME/.config/kdeglobals"
-
-# App launcher icon + Desktop BG
-if [ -f "$APPLET_FILE" ]; then
-  cp "$APPLET_FILE" "$APPLET_FILE.bak" || true
-  sed -i "/plugin=org.kde.plasma.kickoff/,/^\[/{s|^icon=.*$|icon=$ICON_PATH|}" "$APPLET_FILE"
-  sed -i "/plugin=org.kde.plasma.kicker/,/^\[/{s|^icon=.*$|icon=$ICON_PATH|}" "$APPLET_FILE"
-  if ! grep -q "icon=" "$APPLET_FILE"; then
-      sed -i "/plugin=org.kde.plasma.kickoff/a icon=$ICON_PATH" "$APPLET_FILE"
-      sed -i "/plugin=org.kde.plasma.kicker/a icon=$ICON_PATH" "$APPLET_FILE"
-  fi
-  CONTAINMENT_ID=$(awk -F'[][]' '/\[Containments\][0-9]+\]/{id=$2} /\[Containments\][0-9]+\]\[Wallpaper\]/,/\[/{if($0~"plugin=org.kde.image"){print id; exit}}' "$APPLET_FILE")
-  if [ -n "$CONTAINMENT_ID" ]; then
-    sed -i "/\\[Containments\\]\\[$CONTAINMENT_ID\\]\\[Wallpaper\\]\\[org.kde.image\\]\\[General\\]/,/^\\[/ s|^Image=.*$|Image=file://$BG_PATH|" "$APPLET_FILE"
-    grep -q "Image=file://$BG_PATH" "$APPLET_FILE" || \
-      sed -i "/\\[Containments\\]\\[$CONTAINMENT_ID\\]\\[Wallpaper\\]\\[org.kde.image\\]\\[General\\]/ a Image=file://$BG_PATH" "$APPLET_FILE"
-  else
-    echo "No desktop containment found; wallpaper not set."
-  fi
-  chown "$USER:$USER" "$APPLET_FILE"
-else
-  echo "No applet file found; skipping desktop customization."
-fi
 
 echo "$USER ALL=(ALL) NOPASSWD: /usr/bin/pacman" >> /etc/sudoers.d/99-pacman-nopasswd
 
@@ -58,8 +35,6 @@ su - "$USER" -c '
   rm -rf /tmp/yay
   yay -S --noconfirm plymouth-theme-sweet-arch-git || true
 '
-
-rm -rf /etc/sudoers.d/99-pacman-nopasswd
 
 plymouth-set-default-theme -R sweet-arch || true
 
