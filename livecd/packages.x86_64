@@ -18,7 +18,6 @@ os-prober
 # Filesystem tools
 dosfstools
 e2fsprogs
-ntfs-3g
 exfatprogs
 btrfs-progs
 xfsprogs
@@ -40,21 +39,9 @@ reflector
 
 # Hardware support
 mesa
-#xf86-video-amdgpu
-#xf86-video-ati
-#xf86-input-libinput
 xf86-video-vesa
-#vulkan-radeon
 
-# Audio
-pipewire
-pipewire-alsa
-pipewire-pulse
-pipewire-jack
-wireplumber
-pavucontrol
-
-# KDE Plasma (completo pero optimizado)
+# KDE Plasma
 xorg-server
 xorg-xinit
 xorg-apps
@@ -74,9 +61,6 @@ systemsettings
 # Aplicaciones KDE esenciales
 konsole
 dolphin
-ark
-okular
-gwenview
 
 # Navegador y multimedia
 firefox
@@ -119,9 +103,5 @@ dialog
 python
 python-pip
 
-# Additional utilities
-#man-db
-#man-pages
-
-# Plymouth para splash screen
+# Plymouth splash screen
 plymouth
