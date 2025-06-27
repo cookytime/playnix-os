@@ -227,7 +227,7 @@
     "type": "nm"
   },
   "ntp": true,
-  "packages": ["base-devel", "curl", "go", "firefox", "git", "nano", "plymouth", "gwenview"],
+  "packages": ["base-devel", "curl", "go", "firefox", "git", "nano", "plymouth", "gwenview", "zenity"],
   "parallel_downloads": 0,
   "profile_config": {
     "gfx_driver": "AMD / ATI (open-source)",
